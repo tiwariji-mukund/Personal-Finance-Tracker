@@ -25,6 +25,7 @@ SECRET_KEY = get_env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = get_bool('DEBUG')
+TELEGRAM_BOT_TOKEN = get_env('TELEGRAM_BOT_TOKEN')
 
 ALLOWED_HOSTS = []
 
@@ -39,9 +40,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'apps.finance.apps.FinanceConfig',
+    'apps.telegram_bot.apps.TelegramBotConfig',
 ]
 
 MIDDLEWARE = [
+    'core.logging.middleware.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -108,7 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
