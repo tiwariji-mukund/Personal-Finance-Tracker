@@ -7,7 +7,7 @@ from apps.telegram_bot.commands import BOT_COMMANDS
 
 
 class Command(BaseCommand):
-    help = 'Registers the /expense and /income command menu with Telegram.'
+    help = 'Registers the /start, /help, /expense, and /income command menu with Telegram.'
 
     def handle(self, *args, **options):
         app = create_application()

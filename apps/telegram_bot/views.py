@@ -6,7 +6,7 @@ from telegram import Update
 from apps.finance.models import Transaction
 from core.logging import get_logger
 from .bot import create_application
-from .commands import handle_transaction_command
+from .commands import build_help_message, build_welcome_message, handle_transaction_command
 
 log = get_logger(__name__)
 app = create_application()
@@ -25,10 +25,24 @@ def _send_reply(chat_id, text):
     asyncio.run(_send())
 
 
-def _dispatch_transaction_command(message):
-    command = message.text.split(maxsplit=1)[0].split('@', 1)[0]
+def _dispatch_command(message):
+    first_word = message.text.split(maxsplit=1)[0]
+    if not first_word.startswith('/'):
+        return
+
+    command = first_word.split('@', 1)[0].lower()
+
+    if command == '/start':
+        _send_reply(message.chat_id, build_welcome_message())
+        return
+
+    if command == '/help':
+        _send_reply(message.chat_id, build_help_message())
+        return
+
     transaction_type = TRANSACTION_COMMANDS.get(command)
     if not transaction_type:
+        _send_reply(message.chat_id, f"❓ Unknown command '{command}'. Try /expense, /income, or /help.")
         return
 
     reply = handle_transaction_command(message.text, transaction_type, message.date)
@@ -65,7 +79,7 @@ def webhook(request):
         )
 
         if update.message and update.message.text:
-            _dispatch_transaction_command(update.message)
+            _dispatch_command(update.message)
 
         return JsonResponse({
             'status': 'received',

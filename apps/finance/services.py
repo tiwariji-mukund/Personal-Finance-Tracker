@@ -11,7 +11,7 @@ class TransactionInputError(ValueError):
 
 def parse_amount(raw):
     try:
-        amount = Decimal(raw)
+        amount = Decimal(raw.replace(',', ''))  # tolerate thousands separators, e.g. '1,200.50'
     except InvalidOperation:
         raise TransactionInputError(f"'{raw}' is not a valid amount.")
 

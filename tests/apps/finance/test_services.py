@@ -25,6 +25,15 @@ class RecordTransactionTests(TestCase):
         self.assertEqual(transaction.description, 'swiggy')
         self.assertEqual(transaction.transaction_type, Transaction.TransactionType.EXPENSE)
 
+    def test_accepts_comma_separated_amount(self):
+        transaction = record_transaction(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount_raw='1,200.50',
+            category_name='food',
+        )
+
+        self.assertEqual(transaction.amount, Decimal('1200.50'))
+
     def test_rejects_non_numeric_amount(self):
         with self.assertRaises(TransactionInputError):
             record_transaction(

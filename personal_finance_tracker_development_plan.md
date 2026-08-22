@@ -463,8 +463,8 @@ Validate incoming IDs reasonably to prevent log pollution.
 
 **Goal:** Make recording and managing transactions convenient.
 
-- [ ] Task 5.1 — Improve transaction input syntax
-- [ ] Task 5.2 — Add transaction command/help flow
+- [x] Task 5.1 — Improve transaction input syntax
+- [x] Task 5.2 — Add transaction command/help flow
 - [ ] Task 5.3 — Add transaction history
 - [ ] Task 5.4 — Add transaction editing
 - [ ] Task 5.5 — Add transaction deletion

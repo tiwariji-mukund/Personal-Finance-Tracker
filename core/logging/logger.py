@@ -15,14 +15,27 @@ RESERVED_FIELDS = {
     'message',
 }
 
+def _clean_file_path(pathname):
+    path = Path(pathname)
+    try:
+        relative_path = path.relative_to(PROJECT_ROOT)
+    except ValueError:
+        return path.as_posix()
+
+    # Site-packages code (e.g. Django's own logging) resolves to a noisy,
+    # venv-specific path like 'env/lib/python3.11/site-packages/django/...'.
+    # Trim everything up to and including 'site-packages' so it reads like
+    # our own paths do: 'django/core/servers/basehttp.py' rather than that.
+    parts = relative_path.parts
+    if 'site-packages' in parts:
+        relative_path = Path(*parts[parts.index('site-packages') + 1:])
+
+    return relative_path.as_posix()
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.fromtimestamp(record.created, tz=IST).replace(tzinfo=None).isoformat(timespec='milliseconds')
-        file_path = Path(record.pathname)
-        try:
-            relative_path = file_path.relative_to(PROJECT_ROOT).as_posix()
-        except ValueError:
-            relative_path = file_path
+        relative_path = _clean_file_path(record.pathname)
 
         log_data = {
             'timestamp': timestamp,

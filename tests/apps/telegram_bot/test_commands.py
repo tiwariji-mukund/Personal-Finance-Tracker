@@ -1,10 +1,29 @@
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from apps.finance.models import Account, Category, Transaction
-from apps.telegram_bot.commands import handle_transaction_command
+from apps.telegram_bot.commands import BOT_COMMANDS, handle_transaction_command
+
+IMPLEMENTED_COMMANDS = {'start', 'help', 'expense', 'income'}
+
+
+class BotCommandMenuTests(SimpleTestCase):
+    def test_only_registers_implemented_commands(self):
+        registered = {name for name, _ in BOT_COMMANDS}
+        self.assertEqual(registered, IMPLEMENTED_COMMANDS)
+
+    def test_no_duplicate_commands(self):
+        names = [name for name, _ in BOT_COMMANDS]
+        self.assertEqual(len(names), len(set(names)))
+
+    def test_descriptions_are_short_and_syntax_free(self):
+        for name, description in BOT_COMMANDS:
+            self.assertLessEqual(len(description), 40, f'{name} description is too long for the menu')
+            self.assertNotIn('<', description)
+            self.assertNotIn('>', description)
+            self.assertFalse(any(char.isdigit() for char in description), f'{name} description contains a syntax example')
 
 
 class HandleTransactionCommandTests(TestCase):
@@ -21,7 +40,7 @@ class HandleTransactionCommandTests(TestCase):
         self.assertEqual(transaction.amount, Decimal('250'))
         self.assertEqual(transaction.category, self.category)
         self.assertEqual(transaction.description, 'swiggy')
-        self.assertIn('Expense', reply)
+        self.assertIn('spent on', reply)
         self.assertIn('250', reply)
         self.assertIn('swiggy', reply)
 
@@ -31,7 +50,7 @@ class HandleTransactionCommandTests(TestCase):
         transaction = Transaction.objects.get()
         self.assertEqual(transaction.transaction_type, Transaction.TransactionType.INCOME)
         self.assertEqual(transaction.description, '')
-        self.assertIn('Income', reply)
+        self.assertIn('received as', reply)
 
     def test_missing_arguments_returns_usage_without_creating_transaction(self):
         reply = handle_transaction_command('/expense 250', Transaction.TransactionType.EXPENSE, self.now)

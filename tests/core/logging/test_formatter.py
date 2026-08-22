@@ -10,8 +10,8 @@ from core.logging.context import reset_request_id, set_request_id
 from core.logging.logger import IST, JsonFormatter, PROJECT_ROOT
 
 
-def make_record(lineno, msg='test message', context=None, exc_info=None):
-    pathname = str(PROJECT_ROOT / 'apps' / 'finance' / 'models.py')
+def make_record(lineno, msg='test message', context=None, exc_info=None, pathname=None):
+    pathname = pathname or str(PROJECT_ROOT / 'apps' / 'finance' / 'models.py')
     record = logging.LogRecord(
         name='test',
         level=logging.INFO,
@@ -41,6 +41,12 @@ class JsonFormatterTests(SimpleTestCase):
         self.assertEqual(data['request_id'], 'req-123')
         self.assertEqual(data['file'], 'apps/finance/models.py:42')
         self.assertIn('timestamp', data)
+
+    def test_site_packages_paths_are_trimmed_to_the_package_name(self):
+        pathname = str(PROJECT_ROOT / 'env' / 'lib' / 'python3.11' / 'site-packages' / 'django' / 'core' / 'servers' / 'basehttp.py')
+        data = json.loads(self.formatter.format(make_record(213, pathname=pathname)))
+
+        self.assertEqual(data['file'], 'django/core/servers/basehttp.py:213')
 
     def test_request_id_defaults_to_a_generated_uuid4_when_unset(self):
         data = json.loads(self.formatter.format(make_record(1)))
