@@ -7,10 +7,10 @@ from typing import Any
 
 IST = ZoneInfo('Asia/Kolkata')
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RESERVED_FIELS = {
+RESERVED_FIELDS = {
     'timestamp',
     'level',
-    'file'
+    'file',
     'request_id',
     'message',
 }
@@ -33,14 +33,10 @@ class JsonFormatter(logging.Formatter):
         }
 
         context = getattr(record, 'context', {})
+        log_data.update(context)
 
-        for key, value in context.items():
-            if key in RESERVED_FIELS:
-                raise ValueError(f'{key} is reserved logging field.')
-
-            log_data[key] = value
-            if record.exc_info:
-                log_data['exception'] = self.formatException(record.exc_info)
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
 
         return json.dumps(log_data, default=str, ensure_ascii=False)
 
@@ -83,21 +79,25 @@ class ApplicationLogger:
             context=context,
         )
 
-    def error(self, message: str, *, exec_info: bool = False, **context: Any) -> None:
+    def error(self, message: str, *, exc_info: bool = False, **context: Any) -> None:
         self._log(
             logging.ERROR,
             message,
             context=context,
-            exec_info=exec_info,
+            exc_info=exc_info,
         )
 
-    def critical(self, message: str, *, exec_info: bool = False, **context: Any) -> None:
+    def critical(self, message: str, *, exc_info: bool = False, **context: Any) -> None:
         self._log(
             logging.CRITICAL,
             message,
             context=context,
-            exec_info=exec_info,
+            exc_info=exc_info,
         )
 
-    def _log(self, level: int, message: str, context: dict[str, Any], *, exec_info: bool = False) -> None:
-        self._logger.log(level, message, extra={'context': context}, exec_info=exec_info, stacklevel=3)
+    def _log(self, level: int, message: str, context: dict[str, Any], *, exc_info: bool = False) -> None:
+        for key in context:
+            if key in RESERVED_FIELDS:
+                raise ValueError(f'{key} is reserved logging field.')
+
+        self._logger.log(level, message, extra={'context': context}, exc_info=exc_info, stacklevel=3)
