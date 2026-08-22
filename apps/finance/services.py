@@ -44,11 +44,7 @@ def resolve_default_account():
     return account
 
 
-def record_transaction(*, transaction_type, amount_raw, category_name, description='', transaction_at=None):
-    amount = parse_amount(amount_raw)
-    category = resolve_category(category_name)
-    account = resolve_default_account()
-
+def create_transaction(*, transaction_type, amount, category, account, description='', transaction_at=None):
     return Transaction.objects.create(
         transaction_type=transaction_type,
         amount=amount,
@@ -57,3 +53,49 @@ def record_transaction(*, transaction_type, amount_raw, category_name, descripti
         description=description,
         transaction_at=transaction_at or timezone.now(),
     )
+
+
+def record_transaction(*, transaction_type, amount_raw, category_name, description='', transaction_at=None):
+    return create_transaction(
+        transaction_type=transaction_type,
+        amount=parse_amount(amount_raw),
+        category=resolve_category(category_name),
+        account=resolve_default_account(),
+        description=description,
+        transaction_at=transaction_at,
+    )
+
+
+def active_categories():
+    return Category.objects.filter(is_active=True).order_by('name')
+
+
+def active_accounts():
+    return Account.objects.filter(is_active=True).order_by('id')
+
+
+def resolve_transaction(raw_id):
+    try:
+        transaction_id = int(raw_id)
+    except ValueError:
+        raise TransactionInputError(f"'{raw_id}' is not a valid transaction id.")
+
+    try:
+        return Transaction.objects.select_related('category').get(pk=transaction_id)
+    except Transaction.DoesNotExist:
+        raise TransactionInputError(f'No transaction found with id {transaction_id}.')
+
+
+def update_transaction(raw_id, *, amount_raw, category_name, description=''):
+    # ponytail: amount/category/description only — changing expense vs income
+    # isn't supported, delete and re-add if the type itself was wrong.
+    transaction = resolve_transaction(raw_id)
+    transaction.amount = parse_amount(amount_raw)
+    transaction.category = resolve_category(category_name)
+    transaction.description = description
+    transaction.save()
+    return transaction
+
+
+def delete_transaction(transaction):
+    transaction.delete()

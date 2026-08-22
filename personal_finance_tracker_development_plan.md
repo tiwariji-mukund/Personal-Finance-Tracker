@@ -465,11 +465,11 @@ Validate incoming IDs reasonably to prevent log pollution.
 
 - [x] Task 5.1 — Improve transaction input syntax
 - [x] Task 5.2 — Add transaction command/help flow
-- [ ] Task 5.3 — Add transaction history
-- [ ] Task 5.4 — Add transaction editing
-- [ ] Task 5.5 — Add transaction deletion
-- [ ] Task 5.6 — Add category selection workflow
-- [ ] Task 5.7 — Add account selection workflow
+- [x] Task 5.3 — Add transaction history
+- [x] Task 5.4 — Add transaction editing
+- [x] Task 5.5 — Add transaction deletion
+- [x] Task 5.6 — Add category selection workflow
+- [x] Task 5.7 — Add account selection workflow
 - [ ] Task 5.8 — Improve validation/error handling
 - [ ] Task 5.9 — Add tests
 - [ ] Task 5.10 — Verify end-to-end Telegram transaction management

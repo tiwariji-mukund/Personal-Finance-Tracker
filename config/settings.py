@@ -164,5 +164,14 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # httpx logs each outgoing request URL at INFO, and the Telegram Bot
+        # API embeds the bot token directly in that URL
+        # (https://api.telegram.org/bot<TOKEN>/<method>) — silence it here
+        # rather than let the token leak into every log line.
+        'httpx': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
     },
 }
