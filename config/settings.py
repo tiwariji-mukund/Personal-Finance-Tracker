@@ -27,7 +27,9 @@ SECRET_KEY = get_env('SECRET_KEY')
 DEBUG = get_bool('DEBUG')
 TELEGRAM_BOT_TOKEN = get_env('TELEGRAM_BOT_TOKEN')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1'] + [
+    host.strip() for host in get_env('ALLOWED_HOSTS', '').split(',') if host.strip()
+]
 
 
 # Application definition

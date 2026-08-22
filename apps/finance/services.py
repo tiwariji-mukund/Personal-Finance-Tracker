@@ -24,7 +24,11 @@ def parse_amount(raw):
 def resolve_category(name):
     category = Category.objects.filter(name__iexact=name, is_active=True).first()
     if not category:
-        raise TransactionInputError(f"Unknown category '{name}'.")
+        message = f"Unknown category '{name}'."
+        valid = ', '.join(Category.objects.filter(is_active=True).order_by('name').values_list('name', flat=True))
+        if valid:
+            message += f' Valid categories: {valid}'
+        raise TransactionInputError(message)
 
     return category
 
