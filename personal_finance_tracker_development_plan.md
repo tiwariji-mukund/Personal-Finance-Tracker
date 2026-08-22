@@ -359,17 +359,17 @@ Do not switch to polling.
 
 **Goal:** Allow the user to record financial transactions through Telegram.
 
-- [ ] Task 4.3.1 — Define transaction input format
-- [ ] Task 4.3.2 — Parse Telegram messages
-- [ ] Task 4.3.3 — Validate amount
-- [ ] Task 4.3.4 — Validate transaction type
-- [ ] Task 4.3.5 — Resolve category
-- [ ] Task 4.3.6 — Resolve account
-- [ ] Task 4.3.7 — Create transaction through finance service layer
-- [ ] Task 4.3.8 — Return success response to Telegram
-- [ ] Task 4.3.9 — Return useful validation errors
-- [ ] Task 4.3.10 — Add tests
-- [ ] Task 4.3.11 — Verify complete Telegram → DB transaction flow
+- [x] Task 4.3.1 — Define transaction input format
+- [x] Task 4.3.2 — Parse Telegram messages
+- [x] Task 4.3.3 — Validate amount
+- [x] Task 4.3.4 — Validate transaction type
+- [x] Task 4.3.5 — Resolve category
+- [x] Task 4.3.6 — Resolve account
+- [x] Task 4.3.7 — Create transaction through finance service layer
+- [x] Task 4.3.8 — Return success response to Telegram
+- [x] Task 4.3.9 — Return useful validation errors
+- [x] Task 4.3.10 — Add tests
+- [x] Task 4.3.11 — Verify complete Telegram → DB transaction flow
 
 ---
 
