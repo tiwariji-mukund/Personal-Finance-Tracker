@@ -392,8 +392,8 @@ Do not switch to polling.
 - [x] Task 4.4.11 — Verify timestamp format and IST
 - [x] Task 4.4.12 — Verify caller file and line number
 - [x] Task 4.4.13 — Verify reserved log fields cannot be overridden
-- [ ] Task 4.4.14 — Complete final Milestone 4 category-color/admin improvement
-- [ ] Task 4.4.15 — Commit milestone
+- [x] Task 4.4.14 — Complete final Milestone 4 category-color/admin improvement
+- [x] Task 4.4.15 — Commit milestone
 
 ## Mandatory log structure
 

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 from .models import Account, Transaction, Category
 # Register your models here.
 
@@ -7,7 +8,7 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "icon",
-        "color",
+        "color_swatch",
         "transaction_count",
         "is_active",
         "created_at",
@@ -51,6 +52,15 @@ class CategoryAdmin(admin.ModelAdmin):
     @admin.display(description="Transactions")
     def transaction_count(self, obj):
         return obj.transactions.count()
+
+    @admin.display(description="Color")
+    def color_swatch(self, obj):
+        return format_html(
+            '<span style="display:inline-block;width:12px;height:12px;'
+            'border-radius:3px;background:{0};border:1px solid rgba(0,0,0,.2);'
+            'vertical-align:middle;margin-right:6px;"></span>{0}',
+            obj.color,
+        )
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
