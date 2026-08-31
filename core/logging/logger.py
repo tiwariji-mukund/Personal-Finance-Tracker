@@ -5,15 +5,10 @@ from pathlib import Path
 from .context import get_request_id
 from typing import Any
 
-IST = ZoneInfo('Asia/Kolkata')
+from constants import IST_TIMEZONE_NAME, RESERVED_FIELDS
+
+IST = ZoneInfo(IST_TIMEZONE_NAME)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RESERVED_FIELDS = {
-    'timestamp',
-    'level',
-    'file',
-    'request_id',
-    'message',
-}
 
 def _clean_file_path(pathname):
     path = Path(pathname)

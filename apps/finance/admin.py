@@ -1,7 +1,28 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Account, Transaction, Category
+from .models import Account, Category, Person, Transaction, TransactionShare
 # Register your models here.
+
+@admin.register(Person)
+class PersonAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "is_active",
+        "created_at",
+    )
+    list_filter = (
+        "is_active",
+    )
+    search_fields = (
+        "name",
+    )
+    ordering = (
+        "name",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -9,11 +30,13 @@ class CategoryAdmin(admin.ModelAdmin):
         "name",
         "icon",
         "color_swatch",
+        "category_type",
         "transaction_count",
         "is_active",
         "created_at",
     )
     list_filter = (
+        "category_type",
         "is_active",
     )
     search_fields = (
@@ -34,6 +57,7 @@ class CategoryAdmin(admin.ModelAdmin):
                     "name",
                     "icon",
                     "color",
+                    "category_type",
                     "is_active",
                 )
             },
@@ -116,6 +140,11 @@ class AccountAdmin(admin.ModelAdmin):
     def transaction_count(self, obj):
         return obj.transactions.count()
 
+class TransactionShareInline(admin.TabularInline):
+    model = TransactionShare
+    extra = 0
+    fields = ("person", "amount")
+
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
 
@@ -141,6 +170,8 @@ class TransactionAdmin(admin.ModelAdmin):
         "category",
         "account",
     )
+
+    inlines = (TransactionShareInline,)
 
     search_fields = (
         "merchant",
@@ -168,6 +199,7 @@ class TransactionAdmin(admin.ModelAdmin):
                     "amount",
                     "category",
                     "account",
+                    "person",
                 )
             },
         ),

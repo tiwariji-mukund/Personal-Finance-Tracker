@@ -3,32 +3,37 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from telegram import Update
-from apps.finance.models import Transaction
+from constants import (
+    CALLBACK_PREFIX_ACCOUNT,
+    CALLBACK_PREFIX_CATEGORY,
+    CALLBACK_PREFIX_DESCRIPTION_SKIP,
+    TRANSACTION_COMMANDS,
+)
 from core.logging import get_logger
 from .bot import create_application
 from .commands import (
     build_help_message,
+    build_owed_message,
     build_transaction_history_message,
     build_welcome_message,
     handle_account_selected,
     handle_category_selected,
     handle_delete_command,
+    handle_description_skipped,
     handle_edit_command,
     handle_plain_message,
+    handle_settle_command,
+    handle_shared_command,
     handle_transaction_command,
 )
 
 log = get_logger(__name__)
 app = create_application()
 
-TRANSACTION_COMMANDS = {
-    '/expense': Transaction.TransactionType.EXPENSE,
-    '/income': Transaction.TransactionType.INCOME,
-}
-
 CALLBACK_HANDLERS = {
-    'cat': handle_category_selected,
-    'acc': handle_account_selected,
+    CALLBACK_PREFIX_CATEGORY: handle_category_selected,
+    CALLBACK_PREFIX_ACCOUNT: handle_account_selected,
+    CALLBACK_PREFIX_DESCRIPTION_SKIP: handle_description_skipped,
 }
 
 
@@ -74,11 +79,23 @@ def _dispatch_command(message):
         return
 
     if command == '/edit':
-        _send_reply(message.chat_id, handle_edit_command(message.text))
+        _send_reply(message.chat_id, handle_edit_command(message.chat_id, message.text))
         return
 
     if command == '/delete':
-        _send_reply(message.chat_id, handle_delete_command(message.text))
+        _send_reply(message.chat_id, handle_delete_command(message.chat_id, message.text))
+        return
+
+    if command == '/shared':
+        _send_result(message.chat_id, handle_shared_command(message.text))
+        return
+
+    if command == '/settle':
+        _send_result(message.chat_id, handle_settle_command(message.text))
+        return
+
+    if command == '/owed':
+        _send_reply(message.chat_id, build_owed_message())
         return
 
     transaction_type = TRANSACTION_COMMANDS.get(command)
@@ -107,7 +124,7 @@ def _answer_callback(callback_query, text, reply_markup=None):
 def _dispatch_callback_query(callback_query):
     prefix, _, _ = callback_query.data.partition('|')
     handler = CALLBACK_HANDLERS.get(prefix)
-    result = handler(callback_query.data) if handler else '❓ This action is no longer valid.'
+    result = handler(callback_query.data, callback_query.message.chat_id) if handler else '❓ This action is no longer valid.'
 
     if isinstance(result, tuple):
         text, markup = result
@@ -136,34 +153,43 @@ def webhook(request):
 
     try:
         data = json.loads(request.body)
-        update = Update.de_json(
-            data = data,
-            bot = app.bot,
-        )
-
-        log.info(
-            'Telegram update received',
-            event='telegram_update_received',
-            update_id=update.update_id,
-        )
-
-        if update.message and update.message.text:
-            _dispatch_command(update.message)
-        elif update.callback_query:
-            _dispatch_callback_query(update.callback_query)
-
-        return JsonResponse({
-            'status': 'received',
-        }, status=200)
     except json.JSONDecodeError:
         log.warning(
             'Rejected Telegram webhook payload with invalid JSON',
             event='telegram_webhook_invalid_json',
         )
         return JsonResponse({'error': 'Bad Request'}, status=400)
+
+    try:
+        update = Update.de_json(data=data, bot=app.bot)
     except (TypeError, ValueError):
         log.warning(
             'Rejected Telegram webhook payload with invalid update structure',
             event='telegram_webhook_invalid_update',
         )
         return JsonResponse({'error': 'Invalid Telegram update'}, status=400)
+
+    log.info(
+        'Telegram update received',
+        event='telegram_update_received',
+        update_id=update.update_id,
+    )
+
+    try:
+        if update.message and update.message.text:
+            _dispatch_command(update.message)
+        elif update.callback_query:
+            _dispatch_callback_query(update.callback_query)
+    except Exception:
+        # A bug in our own dispatch logic is not "an invalid Telegram update" —
+        # log it as the real error it is. Still acknowledge receipt (200) so
+        # Telegram doesn't retry-storm a request that would fail the same way
+        # every time.
+        log.error(
+            'Unhandled exception while processing Telegram update',
+            event='telegram_dispatch_failed',
+            update_id=update.update_id,
+            exc_info=True,
+        )
+
+    return JsonResponse({'status': 'received'}, status=200)

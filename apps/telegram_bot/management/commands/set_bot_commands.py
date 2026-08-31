@@ -2,8 +2,9 @@ import asyncio
 
 from django.core.management.base import BaseCommand
 
+from constants import BOT_COMMANDS
+
 from apps.telegram_bot.bot import create_application
-from apps.telegram_bot.commands import BOT_COMMANDS
 
 
 class Command(BaseCommand):

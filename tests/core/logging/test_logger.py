@@ -1,7 +1,8 @@
 from django.test import SimpleTestCase
 
+from constants import RESERVED_FIELDS
+
 from core.logging import get_logger
-from core.logging.logger import RESERVED_FIELDS
 
 
 class ReservedFieldTests(SimpleTestCase):

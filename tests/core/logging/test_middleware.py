@@ -3,6 +3,8 @@ import uuid
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
+from constants import REQUEST_ID_HEADER
+
 from core.logging.context import get_request_id
 from core.logging.middleware import RequestIDMiddleware
 
@@ -23,7 +25,7 @@ class RequestIDMiddlewareTests(SimpleTestCase):
 
         response = self._middleware(seen)(request)
 
-        self.assertEqual(response['X-Request-ID'], 'incoming-id')
+        self.assertEqual(response[REQUEST_ID_HEADER], 'incoming-id')
         self.assertEqual(seen, ['incoming-id'])
 
     def test_missing_request_id_generates_uuid4(self):
@@ -32,7 +34,7 @@ class RequestIDMiddlewareTests(SimpleTestCase):
 
         response = self._middleware(seen)(request)
 
-        generated = response['X-Request-ID']
+        generated = response[REQUEST_ID_HEADER]
         self.assertEqual(uuid.UUID(generated).version, 4)
         self.assertEqual(seen, [generated])
 

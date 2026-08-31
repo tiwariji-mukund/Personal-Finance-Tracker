@@ -1,6 +1,5 @@
 from django.core.management.base import BaseCommand
-from apps.finance.constants.categories import DEFAULT_CATEGORIES
-from apps.finance.constants.accounts import DEFAULT_ACCOUNTS
+from constants import DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES
 from apps.finance.models import Category, Account
 
 class Command(BaseCommand):
@@ -29,6 +28,7 @@ class Command(BaseCommand):
                 defaults={
                     "color": category["color"],
                     "icon": category["icon"],
+                    "category_type": category["category_type"],
                     "is_active": True,
                 },
             )

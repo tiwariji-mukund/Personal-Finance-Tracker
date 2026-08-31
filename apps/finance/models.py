@@ -20,6 +20,11 @@ class Category(BaseModel):
     Travel    → #3B82F6
     Shopping  → #10B981
     """
+    class CategoryType(models.TextChoices):
+        EXPENSE = 'EXPENSE', 'Expense'
+        INCOME = 'INCOME', 'Income'
+        TRANSFER = 'TRANSFER', 'Investment'
+
     name = models.CharField(max_length=100, unique=True)
     icon = models.CharField(
         max_length=50,
@@ -28,6 +33,11 @@ class Category(BaseModel):
     color = models.CharField(
         max_length=7,
         default='#3B82F6',
+    )
+    category_type = models.CharField(
+        max_length=20,
+        choices=CategoryType.choices,
+        default=CategoryType.EXPENSE,
     )
     is_active = models.BooleanField(
         default=True,
@@ -62,6 +72,18 @@ class Account(BaseModel):
     def __str__(self):
         return self.name
 
+class Person(BaseModel):
+    """
+    Someone the user shares expenses with or owes/is owed money by.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "People"
+    def __str__(self):
+        return self.name
+
 class Transaction(BaseModel):
     """
     Represents any financial transaction.
@@ -89,6 +111,14 @@ class Transaction(BaseModel):
         Account,
         on_delete=models.PROTECT,
         related_name="transactions",
+    )
+    # Only set on SETTLEMENT transactions: who paid the user back.
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.PROTECT,
+        related_name="settlements",
+        null=True,
+        blank=True,
     )
     amount = models.DecimalField(
         max_digits=10,
@@ -118,5 +148,29 @@ class Transaction(BaseModel):
     def __str__(self):
         return (
             f"{self.get_transaction_type_display()} | "
-            f"{self.category.name} | ₹{self.amount}"
+            f"{self.category.name if self.category else self.person} | ₹{self.amount}"
         )
+
+class TransactionShare(BaseModel):
+    """
+    One person's share of a shared EXPENSE transaction — the portion the
+    user paid on their behalf, owed back until a SETTLEMENT is recorded.
+    """
+    transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.CASCADE,
+        related_name="shares",
+    )
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.PROTECT,
+        related_name="shares",
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+    )
+    class Meta:
+        unique_together = ("transaction", "person")
+    def __str__(self):
+        return f"{self.person.name} owes ₹{self.amount} for #{self.transaction_id}"

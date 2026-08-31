@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Dashboard — {{ month_label }}</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --income: #22c55e;
+    --expense: #ef4444;
+    --invest: #a855f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .nav a {
+    color: var(--text);
+    text-decoration: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  .nav a:hover { border-color: var(--muted); }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .card .label { color: var(--muted); font-size: 0.85rem; margin-bottom: 6px; }
+  .card .value { font-size: 1.5rem; font-weight: 600; }
+  .card.income .value { color: var(--income); }
+  .card.expense .value { color: var(--expense); }
+  .card.net .value.positive { color: var(--income); }
+  .card.net .value.negative { color: var(--expense); }
+  .card.invest .value { color: var(--invest); }
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  section h2 { font-size: 1.05rem; margin: 0 0 16px; }
+  .breakdown { display: flex; gap: 28px; flex-wrap: wrap; align-items: center; }
+  .pie {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .legend { flex: 1; min-width: 220px; list-style: none; margin: 0; padding: 0; }
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .legend li:last-child { border-bottom: none; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .legend .name { flex: 1; }
+  .legend .pct { color: var(--muted); width: 48px; text-align: right; }
+  .legend .amt { width: 100px; text-align: right; }
+  .empty { color: var(--muted); font-size: 0.9rem; }
+  .trend { display: flex; align-items: flex-end; gap: 18px; height: 160px; }
+  .trend-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; height: 100%; }
+  .trend-bars { display: flex; align-items: flex-end; gap: 4px; height: 130px; }
+  .bar { width: 14px; border-radius: 3px 3px 0 0; }
+  .bar.income { background: var(--income); }
+  .bar.expense { background: var(--expense); }
+  .bar.invested { background: var(--invest); }
+  .trend-label { margin-top: 8px; font-size: 0.75rem; color: var(--muted); }
+  .legend-inline { display: flex; gap: 16px; justify-content: center; margin-top: 12px; font-size: 0.8rem; color: var(--muted); }
+  .legend-inline span::before { content: '■'; margin-right: 4px; }
+  .legend-inline .income::before { color: var(--income); }
+  .legend-inline .expense::before { color: var(--expense); }
+  .legend-inline .invested::before { color: var(--invest); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  th.amount, td.amount { text-align: center; font-variant-numeric: tabular-nums; }
+  td.amount.income { color: var(--income); }
+  td.amount.expense { color: var(--expense); }
+  td.amount.transfer { color: var(--invest); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>💰 {{ month_label }}</h1>
+    <div class="nav">
+      <a href="?year={{ prev_year }}&month={{ prev_month }}">← Prev</a>
+      <a href="?year={{ next_year }}&month={{ next_month }}">Next →</a>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card income">
+      <div class="label">Income</div>
+      <div class="value">₹{{ income|floatformat:2 }}</div>
+    </div>
+    <div class="card expense">
+      <div class="label">Expenses</div>
+      <div class="value">₹{{ personal_expenses|floatformat:2 }}</div>
+      {% if reimbursable %}
+        <div class="label">₹{{ expenses|floatformat:2 }} paid, ₹{{ reimbursable|floatformat:2 }} owed back</div>
+      {% endif %}
+    </div>
+    <div class="card net">
+      <div class="label">Net</div>
+      <div class="value {% if net >= 0 %}positive{% else %}negative{% endif %}">₹{{ net|floatformat:2 }}</div>
+    </div>
+    <div class="card invest">
+      <div class="label">Invested</div>
+      <div class="value">₹{{ invested|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Spending by category</h2>
+    {% if category_breakdown %}
+      <div class="breakdown">
+        <div class="pie" style="background: {{ pie_gradient }};"></div>
+        <ul class="legend">
+          {% for row in category_breakdown %}
+            <li>
+              <span class="swatch" style="background: {{ row.color }};"></span>
+              <span class="name">{{ row.icon }} {{ row.name }}</span>
+              <span class="pct">{{ row.percentage|floatformat:1 }}%</span>
+              <span class="amt">₹{{ row.total|floatformat:2 }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% else %}
+      <p class="empty">No expenses recorded this month.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Last {{ trend|length }} months</h2>
+    <div class="trend">
+      {% for row in trend %}
+        <div class="trend-col">
+          <div class="trend-bars">
+            <div class="bar income" style="height: {{ row.income_pct }}%;" title="Income ₹{{ row.income|floatformat:2 }}"></div>
+            <div class="bar expense" style="height: {{ row.expense_pct }}%;" title="Expense ₹{{ row.expense|floatformat:2 }}"></div>
+            <div class="bar invested" style="height: {{ row.invested_pct }}%;" title="Invested ₹{{ row.invested|floatformat:2 }}"></div>
+          </div>
+          <div class="trend-label">{{ row.label }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="legend-inline">
+      <span class="income">Income</span>
+      <span class="expense">Expense</span>
+      <span class="invested">Invested</span>
+    </div>
+  </section>
+
+  {% if outstanding_balances %}
+    <section>
+      <h2>Owed to you</h2>
+      <ul class="legend">
+        {% for row in outstanding_balances %}
+          <li>
+            <span class="name">{{ row.person.name }}</span>
+            <span class="amt">₹{{ row.outstanding|floatformat:2 }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <section>
+    <h2>Recent transactions</h2>
+    {% if transactions %}
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Category</th><th>Account</th><th>Description</th><th class="amount">Amount</th></tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+            <tr>
+              <td>{{ t.transaction_at|date:"d M" }}</td>
+              <td>{% if t.transaction_type == 'SETTLEMENT' %}🤝 {{ t.person.name }}{% else %}{{ t.category.icon }} {{ t.category.name|default:"—" }}{% endif %}</td>
+              <td>{{ t.account.name }}</td>
+              <td>{{ t.description|default:"—" }}</td>
+              <td class="amount {% if t.transaction_type == 'INCOME' or t.transaction_type == 'SETTLEMENT' %}income{% elif t.transaction_type == 'TRANSFER' %}transfer{% else %}expense{% endif %}">
+                {% if t.transaction_type == 'INCOME' or t.transaction_type == 'SETTLEMENT' %}+{% elif t.transaction_type != 'TRANSFER' %}-{% endif %}₹{{ t.amount|floatformat:2 }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No transactions yet.</p>
+    {% endif %}
+  </section>
+</div>
+</body>
+</html>

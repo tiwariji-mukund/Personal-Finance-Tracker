@@ -470,9 +470,9 @@ Validate incoming IDs reasonably to prevent log pollution.
 - [x] Task 5.5 — Add transaction deletion
 - [x] Task 5.6 — Add category selection workflow
 - [x] Task 5.7 — Add account selection workflow
-- [ ] Task 5.8 — Improve validation/error handling
-- [ ] Task 5.9 — Add tests
-- [ ] Task 5.10 — Verify end-to-end Telegram transaction management
+- [x] Task 5.8 — Improve validation/error handling
+- [x] Task 5.9 — Add tests
+- [x] Task 5.10 — Verify end-to-end Telegram transaction management
 
 Keep the UX simple and fast because this is primarily a personal tracker.
 
@@ -484,71 +484,34 @@ Keep the UX simple and fast because this is primarily a personal tracker.
 
 ## Dashboard foundation
 
-- [ ] Task 6.1 — Create dashboard view
-- [ ] Task 6.2 — Create dashboard template
-- [ ] Task 6.3 — Add monthly date filtering
-- [ ] Task 6.4 — Add total income
-- [ ] Task 6.5 — Add total expenses
-- [ ] Task 6.6 — Add net cash flow
+- [x] Task 6.1 — Create dashboard view
+- [x] Task 6.2 — Create dashboard template
+- [x] Task 6.3 — Add monthly date filtering
+- [x] Task 6.4 — Add total income
+- [x] Task 6.5 — Add total expenses
+- [x] Task 6.6 — Add net cash flow
 
 ## Category analysis
 
-- [ ] Task 6.7 — Aggregate expenses by category
-- [ ] Task 6.8 — Build category pie chart
-- [ ] Task 6.9 — Use category stored colors
-- [ ] Task 6.10 — Display category totals
-- [ ] Task 6.11 — Display category percentages
+- [x] Task 6.7 — Aggregate expenses by category
+- [x] Task 6.8 — Build category pie chart
+- [x] Task 6.9 — Use category stored colors
+- [x] Task 6.10 — Display category totals
+- [x] Task 6.11 — Display category percentages
 
 ## Trends
 
-- [ ] Task 6.12 — Add monthly spending trend
+- [x] Task 6.12 — Add monthly spending trend
 - [ ] Task 6.13 — Add category trend where useful
-- [ ] Task 6.14 — Add recent transactions
-- [ ] Task 6.15 — Optimize dashboard queries if needed
-- [ ] Task 6.16 — Add dashboard tests
+- [x] Task 6.14 — Add recent transactions
+- [x] Task 6.15 — Optimize dashboard queries if needed
+- [x] Task 6.16 — Add dashboard tests
 
 The dashboard must derive all values from the database. Do not hardcode financial values.
 
 ---
 
-# Milestone 7 — Loans & Credit Cards
-
-**Goal:** Make the tracker a unified personal financial overview.
-
-Do not design this schema prematurely. Design it when this milestone begins.
-
-## Loan tracking
-
-- [ ] Task 7.1 — Analyze loan requirements
-- [ ] Task 7.2 — Design loan schema
-- [ ] Task 7.3 — Review schema against existing transactions
-- [ ] Task 7.4 — Implement loan model
-- [ ] Task 7.5 — Add loan outstanding tracking
-- [ ] Task 7.6 — Add loan payment tracking
-- [ ] Task 7.7 — Add loan dashboard summary
-- [ ] Task 7.8 — Add tests
-
-## Credit card tracking
-
-- [ ] Task 7.9 — Analyze credit-card requirements
-- [ ] Task 7.10 — Design credit-card schema
-- [ ] Task 7.11 — Review schema against existing accounts/transactions
-- [ ] Task 7.12 — Implement credit-card tracking
-- [ ] Task 7.13 — Add outstanding bill tracking
-- [ ] Task 7.14 — Add payment tracking
-- [ ] Task 7.15 — Add dashboard summary
-- [ ] Task 7.16 — Add tests
-
-## Unified financial dashboard
-
-- [ ] Task 7.17 — Add outstanding loan summary
-- [ ] Task 7.18 — Add credit-card outstanding summary
-- [ ] Task 7.19 — Add unified financial overview
-- [ ] Task 7.20 — Verify financial calculations
-
----
-
-# Milestone 8 — Friends, Reimbursements & Shared Expenses
+# Milestone 7 — Friends, Reimbursements & Shared Expenses
 
 **Goal:** Correctly represent money the user pays on behalf of others.
 
@@ -570,27 +533,64 @@ Temporary money paid on behalf of others
 
 ## Design
 
-- [ ] Task 8.1 — Analyze reimbursement requirements
-- [ ] Task 8.2 — Design person/contact model
-- [ ] Task 8.3 — Design reimbursement/shared-expense model
-- [ ] Task 8.4 — Define accounting behavior
-- [ ] Task 8.5 — Verify effect on dashboard calculations
+- [x] Task 7.1 — Analyze reimbursement requirements
+- [x] Task 7.2 — Design person/contact model
+- [x] Task 7.3 — Design reimbursement/shared-expense model
+- [x] Task 7.4 — Define accounting behavior
+- [x] Task 7.5 — Verify effect on dashboard calculations
 
 ## Implementation
 
-- [ ] Task 8.6 — Add people
-- [ ] Task 8.7 — Record shared expense
-- [ ] Task 8.8 — Track amount owed by each person
-- [ ] Task 8.9 — Record repayment
-- [ ] Task 8.10 — Calculate outstanding reimbursement
-- [ ] Task 8.11 — Add Telegram workflow
-- [ ] Task 8.12 — Add dashboard representation
-- [ ] Task 8.13 — Add tests
-- [ ] Task 8.14 — Verify financial calculations
+- [x] Task 7.6 — Add people
+- [x] Task 7.7 — Record shared expense
+- [x] Task 7.8 — Track amount owed by each person
+- [x] Task 7.9 — Record repayment
+- [x] Task 7.10 — Calculate outstanding reimbursement
+- [x] Task 7.11 — Add Telegram workflow
+- [x] Task 7.12 — Add dashboard representation
+- [x] Task 7.13 — Add tests
+- [x] Task 7.14 — Verify financial calculations
 
 Important:
 
 Do not incorrectly classify the entire amount paid on behalf of others as the user's personal expense.
+
+---
+
+# Milestone 8 — Loans & Credit Cards
+
+**Goal:** Make the tracker a unified personal financial overview.
+
+Do not design this schema prematurely. Design it when this milestone begins.
+
+## Loan tracking
+
+- [ ] Task 8.1 — Analyze loan requirements
+- [ ] Task 8.2 — Design loan schema
+- [ ] Task 8.3 — Review schema against existing transactions
+- [ ] Task 8.4 — Implement loan model
+- [ ] Task 8.5 — Add loan outstanding tracking
+- [ ] Task 8.6 — Add loan payment tracking
+- [ ] Task 8.7 — Add loan dashboard summary
+- [ ] Task 8.8 — Add tests
+
+## Credit card tracking
+
+- [ ] Task 8.9 — Analyze credit-card requirements
+- [ ] Task 8.10 — Design credit-card schema
+- [ ] Task 8.11 — Review schema against existing accounts/transactions
+- [ ] Task 8.12 — Implement credit-card tracking
+- [ ] Task 8.13 — Add outstanding bill tracking
+- [ ] Task 8.14 — Add payment tracking
+- [ ] Task 8.15 — Add dashboard summary
+- [ ] Task 8.16 — Add tests
+
+## Unified financial dashboard
+
+- [ ] Task 8.17 — Add outstanding loan summary
+- [ ] Task 8.18 — Add credit-card outstanding summary
+- [ ] Task 8.19 — Add unified financial overview
+- [ ] Task 8.20 — Verify financial calculations
 
 ---
 
@@ -858,9 +858,9 @@ Transaction experience
         ↓
 Dashboard
         ↓
-Loans / Credit Cards
-        ↓
 Reimbursements
+        ↓
+Loans / Credit Cards
         ↓
 AI
         ↓

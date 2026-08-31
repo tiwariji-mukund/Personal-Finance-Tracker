@@ -2,6 +2,8 @@ from django.http import HttpRequest, HttpResponse
 from .context import generate_request_id, reset_request_id, set_request_id
 from . import get_logger
 
+from constants import REQUEST_ID_HEADER
+
 logger = get_logger(__name__)
 
 class RequestIDMiddleware:
@@ -12,7 +14,7 @@ class RequestIDMiddleware:
         self,
         request: HttpRequest,
     ) -> HttpResponse:
-        request_id = request.headers.get("X-Request-ID")
+        request_id = request.headers.get(REQUEST_ID_HEADER)
 
         if not request_id:
             request_id = generate_request_id()
@@ -23,7 +25,7 @@ class RequestIDMiddleware:
         try:
             response = self.get_response(request)
 
-            response["X-Request-ID"] = request_id
+            response[REQUEST_ID_HEADER] = request_id
 
             return response
 

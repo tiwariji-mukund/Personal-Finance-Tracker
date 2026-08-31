@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from django.test import SimpleTestCase
 
 from core.logging.context import reset_request_id, set_request_id
-from core.logging.logger import IST, JsonFormatter, PROJECT_ROOT
+from core.logging.logger import JsonFormatter, PROJECT_ROOT
 
 
 def make_record(lineno, msg='test message', context=None, exc_info=None, pathname=None):

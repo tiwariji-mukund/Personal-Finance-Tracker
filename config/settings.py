@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from .env import get_env, get_bool
+from constants import IST_TIMEZONE_NAME
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,6 +27,12 @@ SECRET_KEY = get_env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = get_bool('DEBUG')
 TELEGRAM_BOT_TOKEN = get_env('TELEGRAM_BOT_TOKEN')
+
+# Optional. CA bundle used to verify outbound Telegram Bot API TLS
+# connections (see apps/telegram_bot/bot.py) — needed behind a TLS-inspecting
+# corporate proxy whose CA isn't in certifi's bundle. Unset preserves normal
+# certifi-based verification.
+TELEGRAM_CA_BUNDLE = get_env('TELEGRAM_CA_BUNDLE', '') or None
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1'] + [
     host.strip() for host in get_env('ALLOWED_HOSTS', '').split(',') if host.strip()
@@ -113,7 +120,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = IST_TIMEZONE_NAME
 
 USE_I18N = True
 
