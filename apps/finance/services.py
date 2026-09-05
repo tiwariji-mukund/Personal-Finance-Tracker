@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from constants import DASHBOARD_TREND_MONTHS, MAX_TRANSACTION_AMOUNT, TRANSACTION_HISTORY_LIMIT
 
-from .models import Account, Category, Person, Transaction, TransactionShare
+from .models import Account, Category, Loan, Person, Transaction, TransactionShare
 
 
 class TransactionInputError(ValueError):
@@ -55,13 +55,14 @@ def resolve_default_account():
     return account
 
 
-def create_transaction(*, transaction_type, amount, account, category=None, person=None, description='', transaction_at=None):
+def create_transaction(*, transaction_type, amount, account, category=None, person=None, loan=None, description='', transaction_at=None):
     return Transaction.objects.create(
         transaction_type=transaction_type,
         amount=amount,
         category=category,
         account=account,
         person=person,
+        loan=loan,
         description=description,
         transaction_at=transaction_at or timezone.now(),
     )
@@ -153,6 +154,49 @@ def outstanding_balances():
     return [
         {'person': person, 'outstanding': outstanding_for_person(person)}
         for person in active_people()
+    ]
+
+
+def active_loans():
+    return Loan.objects.filter(is_active=True)
+
+
+def resolve_loan(raw_id):
+    try:
+        loan_id = int(raw_id)
+    except (TypeError, ValueError):
+        raise TransactionInputError(f"'{raw_id}' is not a valid loan id.")
+
+    loan = active_loans().filter(pk=loan_id).first()
+    if not loan:
+        raise TransactionInputError(f'No active loan found with id {loan_id}.')
+
+    return loan
+
+
+def record_loan_payment(*, loan_id, amount_raw, description='', transaction_at=None):
+    """Records a payment made towards an outstanding loan."""
+    return create_transaction(
+        transaction_type=Transaction.TransactionType.LOAN_PAYMENT,
+        amount=parse_amount(amount_raw),
+        account=resolve_default_account(),
+        loan=resolve_loan(loan_id),
+        description=description,
+        transaction_at=transaction_at,
+    )
+
+
+def outstanding_for_loan(loan):
+    paid = Transaction.objects.filter(
+        transaction_type=Transaction.TransactionType.LOAN_PAYMENT, loan=loan
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    return loan.principal - paid
+
+
+def outstanding_loans():
+    return [
+        {'loan': loan, 'outstanding': outstanding_for_loan(loan)}
+        for loan in active_loans()
     ]
 
 

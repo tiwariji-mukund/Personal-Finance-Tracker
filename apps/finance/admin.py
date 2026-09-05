@@ -223,6 +223,7 @@ class TransactionAdmin(admin.ModelAdmin):
                     "category",
                     "account",
                     "person",
+                    "loan",
                 )
             },
         ),

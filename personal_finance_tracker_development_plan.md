@@ -569,8 +569,8 @@ Do not design this schema prematurely. Design it when this milestone begins.
 - [x] Task 8.2 — Design loan schema
 - [x] Task 8.3 — Review schema against existing transactions
 - [x] Task 8.4 — Implement loan model
-- [ ] Task 8.5 — Add loan outstanding tracking
-- [ ] Task 8.6 — Add loan payment tracking
+- [x] Task 8.5 — Add loan outstanding tracking
+- [x] Task 8.6 — Add loan payment tracking
 - [ ] Task 8.7 — Add loan dashboard summary
 - [ ] Task 8.8 — Add tests
 

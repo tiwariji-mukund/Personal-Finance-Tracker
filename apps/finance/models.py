@@ -109,6 +109,7 @@ class Transaction(BaseModel):
         INCOME = "INCOME", "Income"
         TRANSFER = "TRANSFER", "Transfer"
         SETTLEMENT = "SETTLEMENT", "Settlement"
+        LOAN_PAYMENT = "LOAN_PAYMENT", "Loan Payment"
 
     transaction_type = models.CharField(
         max_length=20,
@@ -133,6 +134,14 @@ class Transaction(BaseModel):
         Person,
         on_delete=models.PROTECT,
         related_name="settlements",
+        null=True,
+        blank=True,
+    )
+    # Only set on LOAN_PAYMENT transactions: which loan this pays down.
+    loan = models.ForeignKey(
+        Loan,
+        on_delete=models.PROTECT,
+        related_name="payments",
         null=True,
         blank=True,
     )
@@ -164,7 +173,7 @@ class Transaction(BaseModel):
     def __str__(self):
         return (
             f"{self.get_transaction_type_display()} | "
-            f"{self.category.name if self.category else self.person} | ₹{self.amount}"
+            f"{self.category.name if self.category else (self.person or self.loan)} | ₹{self.amount}"
         )
 
 class TransactionShare(BaseModel):

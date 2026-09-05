@@ -6,15 +6,18 @@ from django.utils import timezone
 
 from constants import MAX_TRANSACTION_AMOUNT, TRANSACTION_HISTORY_LIMIT
 
-from apps.finance.models import Account, Category, Person, Transaction, TransactionShare
+from apps.finance.models import Account, Category, Loan, Person, Transaction, TransactionShare
 from apps.finance.services import (
     TransactionInputError,
     dashboard_summary,
     delete_transaction,
     monthly_trend,
     outstanding_balances,
+    outstanding_for_loan,
     outstanding_for_person,
+    outstanding_loans,
     parse_amount,
+    record_loan_payment,
     record_settlement,
     record_shared_expense,
     record_transaction,
@@ -405,6 +408,56 @@ class OutstandingBalanceTests(TestCase):
 
         self.assertEqual(balances[self.alice], Decimal('400'))
         self.assertEqual(balances[self.bob], Decimal('0'))
+
+
+class RecordLoanPaymentTests(TestCase):
+    def setUp(self):
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.loan = Loan.objects.create(
+            lender_name='Bank', principal=Decimal('10000'), disbursed_at=timezone.now().date(),
+        )
+
+    def test_creates_a_loan_payment_transaction(self):
+        transaction = record_loan_payment(loan_id=str(self.loan.pk), amount_raw='2000', description='EMI')
+
+        self.assertEqual(transaction.transaction_type, Transaction.TransactionType.LOAN_PAYMENT)
+        self.assertEqual(transaction.amount, Decimal('2000'))
+        self.assertEqual(transaction.loan, self.loan)
+        self.assertIsNone(transaction.category)
+
+    def test_rejects_an_unknown_loan_id(self):
+        with self.assertRaises(TransactionInputError):
+            record_loan_payment(loan_id='99999', amount_raw='2000')
+
+    def test_rejects_an_inactive_loan(self):
+        self.loan.is_active = False
+        self.loan.save()
+
+        with self.assertRaises(TransactionInputError):
+            record_loan_payment(loan_id=str(self.loan.pk), amount_raw='2000')
+
+
+class OutstandingLoanTests(TestCase):
+    def setUp(self):
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.loan = Loan.objects.create(
+            lender_name='Bank', principal=Decimal('10000'), disbursed_at=timezone.now().date(),
+        )
+
+    def test_outstanding_is_principal_minus_payments(self):
+        record_loan_payment(loan_id=str(self.loan.pk), amount_raw='3000')
+
+        self.assertEqual(outstanding_for_loan(self.loan), Decimal('7000'))
+
+    def test_outstanding_is_the_full_principal_with_no_payments(self):
+        self.assertEqual(outstanding_for_loan(self.loan), Decimal('10000'))
+
+    def test_outstanding_loans_lists_all_active_loans(self):
+        record_loan_payment(loan_id=str(self.loan.pk), amount_raw='4000')
+
+        balances = {row['loan']: row['outstanding'] for row in outstanding_loans()}
+
+        self.assertEqual(balances[self.loan], Decimal('6000'))
 
 
 class DashboardSummaryReimbursementTests(TestCase):
