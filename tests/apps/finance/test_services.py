@@ -192,6 +192,16 @@ class UpdateTransactionTests(TestCase):
         self.transaction.refresh_from_db()
         self.assertEqual(self.transaction.amount, Decimal('100'))
 
+    def test_rejects_amount_below_shares_already_split(self):
+        alice = Person.objects.create(name='Alice', is_active=True)
+        TransactionShare.objects.create(transaction=self.transaction, person=alice, amount=Decimal('80'))
+
+        with self.assertRaises(TransactionInputError):
+            update_transaction(str(self.transaction.pk), amount_raw='50', category_name='food')
+
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.amount, Decimal('100'))
+
 
 class DeleteTransactionTests(TestCase):
     def setUp(self):

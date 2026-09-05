@@ -172,7 +172,15 @@ def update_transaction(raw_id, *, amount_raw, category_name, description=''):
     # ponytail: amount/category/description only — changing expense vs income
     # isn't supported, delete and re-add if the type itself was wrong.
     transaction = resolve_transaction(raw_id)
-    transaction.amount = parse_amount(amount_raw)
+    amount = parse_amount(amount_raw)
+
+    total_shares = transaction.shares.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    if total_shares > amount:
+        raise TransactionInputError(
+            f'Amount (₹{amount:,.2f}) cannot be less than the shares already split (₹{total_shares:,.2f}).'
+        )
+
+    transaction.amount = amount
     transaction.category = resolve_category(category_name, transaction.transaction_type)
     transaction.description = description
     transaction.save()
