@@ -210,6 +210,20 @@
     </section>
   {% endif %}
 
+  {% if outstanding_loans %}
+    <section>
+      <h2>Loans outstanding</h2>
+      <ul class="legend">
+        {% for row in outstanding_loans %}
+          <li>
+            <span class="name">{{ row.loan.lender_name }}</span>
+            <span class="amt">₹{{ row.outstanding|floatformat:2 }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   <section>
     <h2>Recent transactions</h2>
     {% if transactions %}

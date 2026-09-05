@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.finance.models import Account, Category, Person, Transaction, TransactionShare
+from apps.finance.models import Account, Category, Loan, Person, Transaction, TransactionShare
 
 
 class DashboardViewTests(TestCase):
@@ -90,3 +90,33 @@ class DashboardViewTests(TestCase):
         self.assertEqual(response.context['personal_expenses'], Decimal('20000'))
         balances = {row['person']: row['outstanding'] for row in response.context['outstanding_balances']}
         self.assertEqual(balances[alice], Decimal('5000'))
+
+    def test_an_outstanding_loan_is_shown_on_the_dashboard(self):
+        loan = Loan.objects.create(lender_name='Bank', principal=Decimal('10000'), disbursed_at=date(2026, 1, 1))
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.LOAN_PAYMENT,
+            amount=Decimal('3000'),
+            account=self.account,
+            loan=loan,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
+
+        balances = {row['loan']: row['outstanding'] for row in response.context['outstanding_loans']}
+        self.assertEqual(balances[loan], Decimal('7000'))
+        self.assertContains(response, 'Bank')
+
+    def test_a_fully_paid_loan_is_excluded_from_the_dashboard(self):
+        loan = Loan.objects.create(lender_name='Bank', principal=Decimal('10000'), disbursed_at=date(2026, 1, 1))
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.LOAN_PAYMENT,
+            amount=Decimal('10000'),
+            account=self.account,
+            loan=loan,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
+
+        self.assertEqual(response.context['outstanding_loans'], [])
