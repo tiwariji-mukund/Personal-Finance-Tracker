@@ -4,7 +4,14 @@ from decimal import Decimal
 from django.shortcuts import render
 from django.utils import timezone
 
-from .services import dashboard_summary, monthly_trend, outstanding_balances, outstanding_loans, shift_month
+from .services import (
+    dashboard_summary,
+    monthly_trend,
+    outstanding_balances,
+    outstanding_credit_cards,
+    outstanding_loans,
+    shift_month,
+)
 
 
 def _parse_year_month(request):
@@ -60,5 +67,6 @@ def dashboard(request):
         'trend': _with_bar_heights(monthly_trend()),
         'outstanding_balances': [row for row in outstanding_balances() if row['outstanding'] != 0],
         'outstanding_loans': [row for row in outstanding_loans() if row['outstanding'] != 0],
+        'outstanding_credit_cards': [row for row in outstanding_credit_cards() if row['outstanding'] != 0],
     }
     return render(request, 'finance/dashboard.html', context)

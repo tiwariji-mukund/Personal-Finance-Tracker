@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.finance.models import Account, Category, Loan, Person, Transaction, TransactionShare
+from apps.finance.models import Account, Category, CreditCard, Loan, Person, Transaction, TransactionShare
 
 
 class DashboardViewTests(TestCase):
@@ -120,3 +120,41 @@ class DashboardViewTests(TestCase):
         response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
 
         self.assertEqual(response.context['outstanding_loans'], [])
+
+    def test_an_outstanding_credit_card_bill_is_shown_on_the_dashboard(self):
+        card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        card = CreditCard.objects.create(account=card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('3000'),
+            category=self.category,
+            account=card_account,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
+
+        balances = {row['credit_card']: row['outstanding'] for row in response.context['outstanding_credit_cards']}
+        self.assertEqual(balances[card], Decimal('3000'))
+        self.assertContains(response, 'HDFC Card')
+
+    def test_a_fully_paid_credit_card_is_excluded_from_the_dashboard(self):
+        card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        card = CreditCard.objects.create(account=card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('3000'),
+            category=self.category,
+            account=card_account,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.CARD_PAYMENT,
+            amount=Decimal('3000'),
+            account=card_account,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 20)),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
+
+        self.assertEqual(response.context['outstanding_credit_cards'], [])

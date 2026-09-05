@@ -582,8 +582,8 @@ Do not design this schema prematurely. Design it when this milestone begins.
 - [x] Task 8.12 — Implement credit-card tracking
 - [x] Task 8.13 — Add outstanding bill tracking
 - [x] Task 8.14 — Add payment tracking
-- [ ] Task 8.15 — Add dashboard summary
-- [ ] Task 8.16 — Add tests
+- [x] Task 8.15 — Add dashboard summary
+- [x] Task 8.16 — Add tests
 
 ## Unified financial dashboard
 

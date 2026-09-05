@@ -224,6 +224,21 @@
     </section>
   {% endif %}
 
+  {% if outstanding_credit_cards %}
+    <section>
+      <h2>Credit cards outstanding</h2>
+      <ul class="legend">
+        {% for row in outstanding_credit_cards %}
+          <li>
+            <span class="name">{{ row.credit_card.account.name }}</span>
+            <span class="pct">of ₹{{ row.credit_card.credit_limit|floatformat:2 }}</span>
+            <span class="amt">₹{{ row.outstanding|floatformat:2 }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   <section>
     <h2>Recent transactions</h2>
     {% if transactions %}
