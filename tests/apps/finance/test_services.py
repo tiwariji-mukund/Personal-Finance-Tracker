@@ -6,17 +6,20 @@ from django.utils import timezone
 
 from constants import MAX_TRANSACTION_AMOUNT, TRANSACTION_HISTORY_LIMIT
 
-from apps.finance.models import Account, Category, Loan, Person, Transaction, TransactionShare
+from apps.finance.models import Account, Category, CreditCard, Loan, Person, Transaction, TransactionShare
 from apps.finance.services import (
     TransactionInputError,
     dashboard_summary,
     delete_transaction,
     monthly_trend,
     outstanding_balances,
+    outstanding_credit_cards,
+    outstanding_for_card,
     outstanding_for_loan,
     outstanding_for_person,
     outstanding_loans,
     parse_amount,
+    record_card_payment,
     record_loan_payment,
     record_settlement,
     record_shared_expense,
@@ -458,6 +461,59 @@ class OutstandingLoanTests(TestCase):
         balances = {row['loan']: row['outstanding'] for row in outstanding_loans()}
 
         self.assertEqual(balances[self.loan], Decimal('6000'))
+
+
+class RecordCardPaymentTests(TestCase):
+    def setUp(self):
+        self.card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        self.card = CreditCard.objects.create(account=self.card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+
+    def test_creates_a_card_payment_transaction_on_the_cards_account(self):
+        transaction = record_card_payment(card_id=str(self.card.pk), amount_raw='2000', description='bill payment')
+
+        self.assertEqual(transaction.transaction_type, Transaction.TransactionType.CARD_PAYMENT)
+        self.assertEqual(transaction.amount, Decimal('2000'))
+        self.assertEqual(transaction.account, self.card_account)
+
+    def test_rejects_an_unknown_card_id(self):
+        with self.assertRaises(TransactionInputError):
+            record_card_payment(card_id='99999', amount_raw='2000')
+
+    def test_rejects_a_card_on_an_inactive_account(self):
+        self.card_account.is_active = False
+        self.card_account.save()
+
+        with self.assertRaises(TransactionInputError):
+            record_card_payment(card_id=str(self.card.pk), amount_raw='2000')
+
+
+class OutstandingCreditCardTests(TestCase):
+    def setUp(self):
+        self.food = Category.objects.create(name='Food', is_active=True)
+        self.card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        self.card = CreditCard.objects.create(account=self.card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+
+    def test_outstanding_is_card_expenses_minus_payments(self):
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('3000'), category=self.food, account=self.card_account, transaction_at=timezone.now(),
+        )
+        record_card_payment(card_id=str(self.card.pk), amount_raw='1000')
+
+        self.assertEqual(outstanding_for_card(self.card), Decimal('2000'))
+
+    def test_outstanding_is_zero_with_no_spend(self):
+        self.assertEqual(outstanding_for_card(self.card), Decimal('0'))
+
+    def test_outstanding_credit_cards_lists_all_active_cards(self):
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('3000'), category=self.food, account=self.card_account, transaction_at=timezone.now(),
+        )
+
+        balances = {row['credit_card']: row['outstanding'] for row in outstanding_credit_cards()}
+
+        self.assertEqual(balances[self.card], Decimal('3000'))
 
 
 class DashboardSummaryReimbursementTests(TestCase):

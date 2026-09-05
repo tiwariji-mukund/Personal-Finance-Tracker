@@ -133,6 +133,7 @@ class Transaction(BaseModel):
         TRANSFER = "TRANSFER", "Transfer"
         SETTLEMENT = "SETTLEMENT", "Settlement"
         LOAN_PAYMENT = "LOAN_PAYMENT", "Loan Payment"
+        CARD_PAYMENT = "CARD_PAYMENT", "Card Payment"
 
     transaction_type = models.CharField(
         max_length=20,

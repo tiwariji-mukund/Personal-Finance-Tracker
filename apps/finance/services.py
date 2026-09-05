@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from constants import DASHBOARD_TREND_MONTHS, MAX_TRANSACTION_AMOUNT, TRANSACTION_HISTORY_LIMIT
 
-from .models import Account, Category, Loan, Person, Transaction, TransactionShare
+from .models import Account, Category, CreditCard, Loan, Person, Transaction, TransactionShare
 
 
 class TransactionInputError(ValueError):
@@ -197,6 +197,52 @@ def outstanding_loans():
     return [
         {'loan': loan, 'outstanding': outstanding_for_loan(loan)}
         for loan in active_loans()
+    ]
+
+
+def active_credit_cards():
+    return CreditCard.objects.filter(account__is_active=True)
+
+
+def resolve_credit_card(raw_id):
+    try:
+        card_id = int(raw_id)
+    except (TypeError, ValueError):
+        raise TransactionInputError(f"'{raw_id}' is not a valid credit card id.")
+
+    card = active_credit_cards().filter(pk=card_id).first()
+    if not card:
+        raise TransactionInputError(f'No active credit card found with id {card_id}.')
+
+    return card
+
+
+def record_card_payment(*, card_id, amount_raw, description='', transaction_at=None):
+    """Records a payment made towards an outstanding credit card bill."""
+    credit_card = resolve_credit_card(card_id)
+    return create_transaction(
+        transaction_type=Transaction.TransactionType.CARD_PAYMENT,
+        amount=parse_amount(amount_raw),
+        account=credit_card.account,
+        description=description,
+        transaction_at=transaction_at,
+    )
+
+
+def outstanding_for_card(credit_card):
+    spent = Transaction.objects.filter(
+        transaction_type=Transaction.TransactionType.EXPENSE, account=credit_card.account
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    paid = Transaction.objects.filter(
+        transaction_type=Transaction.TransactionType.CARD_PAYMENT, account=credit_card.account
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    return spent - paid
+
+
+def outstanding_credit_cards():
+    return [
+        {'credit_card': card, 'outstanding': outstanding_for_card(card)}
+        for card in active_credit_cards()
     ]
 
 
