@@ -1,7 +1,23 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Account, Category, Loan, Person, Transaction, TransactionShare
+from .models import Account, Category, CreditCard, Loan, Person, Transaction, TransactionShare
 # Register your models here.
+
+@admin.register(CreditCard)
+class CreditCardAdmin(admin.ModelAdmin):
+    list_display = (
+        "account",
+        "credit_limit",
+        "billing_day",
+        "due_day",
+    )
+    search_fields = (
+        "account__name",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
 
 @admin.register(Loan)
 class LoanAdmin(admin.ModelAdmin):

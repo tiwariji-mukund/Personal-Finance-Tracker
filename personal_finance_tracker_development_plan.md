@@ -579,7 +579,7 @@ Do not design this schema prematurely. Design it when this milestone begins.
 - [x] Task 8.9 — Analyze credit-card requirements
 - [x] Task 8.10 — Design credit-card schema
 - [x] Task 8.11 — Review schema against existing accounts/transactions
-- [ ] Task 8.12 — Implement credit-card tracking
+- [x] Task 8.12 — Implement credit-card tracking
 - [ ] Task 8.13 — Add outstanding bill tracking
 - [ ] Task 8.14 — Add payment tracking
 - [ ] Task 8.15 — Add dashboard summary

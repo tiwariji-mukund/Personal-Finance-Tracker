@@ -1,3 +1,4 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 class BaseModel(models.Model):
@@ -71,6 +72,28 @@ class Account(BaseModel):
         ordering = ["name"]
     def __str__(self):
         return self.name
+
+class CreditCard(BaseModel):
+    """
+    Billing details for an Account of type CREDIT_CARD. Outstanding balance
+    is derived (EXPENSE minus CARD_PAYMENT transactions on the account),
+    not stored here.
+    """
+    account = models.OneToOneField(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="credit_card",
+        limit_choices_to={"account_type": Account.AccountType.CREDIT_CARD},
+    )
+    credit_limit = models.DecimalField(max_digits=10, decimal_places=2)
+    billing_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+    )
+    due_day = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+    )
+    def __str__(self):
+        return f"{self.account.name} (limit ₹{self.credit_limit})"
 
 class Person(BaseModel):
     """
