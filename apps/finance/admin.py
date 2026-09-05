@@ -1,7 +1,30 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Account, Category, Person, Transaction, TransactionShare
+from .models import Account, Category, Loan, Person, Transaction, TransactionShare
 # Register your models here.
+
+@admin.register(Loan)
+class LoanAdmin(admin.ModelAdmin):
+    list_display = (
+        "lender_name",
+        "principal",
+        "interest_rate",
+        "disbursed_at",
+        "is_active",
+    )
+    list_filter = (
+        "is_active",
+    )
+    search_fields = (
+        "lender_name",
+    )
+    ordering = (
+        "-disbursed_at",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):

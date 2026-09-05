@@ -84,6 +84,22 @@ class Person(BaseModel):
     def __str__(self):
         return self.name
 
+class Loan(BaseModel):
+    """
+    Money borrowed from a lender, tracked as a single outstanding balance
+    (principal minus payments) rather than an amortization schedule.
+    """
+    lender_name = models.CharField(max_length=100)
+    principal = models.DecimalField(max_digits=10, decimal_places=2)
+    # Annual %, informational only — not used to compute interest/amortization.
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    disbursed_at = models.DateField()
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        ordering = ["-disbursed_at"]
+    def __str__(self):
+        return f"{self.lender_name} — ₹{self.principal}"
+
 class Transaction(BaseModel):
     """
     Represents any financial transaction.

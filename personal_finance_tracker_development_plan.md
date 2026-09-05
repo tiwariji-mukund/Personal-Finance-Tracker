@@ -565,10 +565,10 @@ Do not design this schema prematurely. Design it when this milestone begins.
 
 ## Loan tracking
 
-- [ ] Task 8.1 — Analyze loan requirements
-- [ ] Task 8.2 — Design loan schema
-- [ ] Task 8.3 — Review schema against existing transactions
-- [ ] Task 8.4 — Implement loan model
+- [x] Task 8.1 — Analyze loan requirements
+- [x] Task 8.2 — Design loan schema
+- [x] Task 8.3 — Review schema against existing transactions
+- [x] Task 8.4 — Implement loan model
 - [ ] Task 8.5 — Add loan outstanding tracking
 - [ ] Task 8.6 — Add loan payment tracking
 - [ ] Task 8.7 — Add loan dashboard summary
@@ -576,9 +576,9 @@ Do not design this schema prematurely. Design it when this milestone begins.
 
 ## Credit card tracking
 
-- [ ] Task 8.9 — Analyze credit-card requirements
-- [ ] Task 8.10 — Design credit-card schema
-- [ ] Task 8.11 — Review schema against existing accounts/transactions
+- [x] Task 8.9 — Analyze credit-card requirements
+- [x] Task 8.10 — Design credit-card schema
+- [x] Task 8.11 — Review schema against existing accounts/transactions
 - [ ] Task 8.12 — Implement credit-card tracking
 - [ ] Task 8.13 — Add outstanding bill tracking
 - [ ] Task 8.14 — Add payment tracking
