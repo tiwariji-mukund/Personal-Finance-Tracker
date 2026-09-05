@@ -11,6 +11,7 @@ from .services import (
     outstanding_credit_cards,
     outstanding_loans,
     shift_month,
+    total_debt,
 )
 
 
@@ -68,5 +69,6 @@ def dashboard(request):
         'outstanding_balances': [row for row in outstanding_balances() if row['outstanding'] != 0],
         'outstanding_loans': [row for row in outstanding_loans() if row['outstanding'] != 0],
         'outstanding_credit_cards': [row for row in outstanding_credit_cards() if row['outstanding'] != 0],
+        'total_debt': total_debt(),
     }
     return render(request, 'finance/dashboard.html', context)

@@ -158,3 +158,26 @@ class DashboardViewTests(TestCase):
         response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
 
         self.assertEqual(response.context['outstanding_credit_cards'], [])
+
+    def test_total_debt_combines_loans_and_credit_cards(self):
+        loan = Loan.objects.create(lender_name='Bank', principal=Decimal('10000'), disbursed_at=date(2026, 1, 1))
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.LOAN_PAYMENT,
+            amount=Decimal('4000'),
+            account=self.account,
+            loan=loan,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+        card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        CreditCard.objects.create(account=card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('2500'),
+            category=self.category,
+            account=card_account,
+            transaction_at=timezone.make_aware(datetime(2026, 1, 15)),
+        )
+
+        response = self.client.get(reverse('dashboard'), {'year': 2026, 'month': 1})
+
+        self.assertEqual(response.context['total_debt'], Decimal('6000') + Decimal('2500'))

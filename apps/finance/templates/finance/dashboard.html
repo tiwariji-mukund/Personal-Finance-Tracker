@@ -62,6 +62,7 @@
   .card.net .value.positive { color: var(--income); }
   .card.net .value.negative { color: var(--expense); }
   .card.invest .value { color: var(--invest); }
+  .card.debt .value { color: var(--expense); }
   section {
     background: var(--card);
     border: 1px solid var(--border);
@@ -148,6 +149,10 @@
     <div class="card invest">
       <div class="label">Invested</div>
       <div class="value">₹{{ invested|floatformat:2 }}</div>
+    </div>
+    <div class="card debt">
+      <div class="label">Total Debt</div>
+      <div class="value">₹{{ total_debt|floatformat:2 }}</div>
     </div>
   </div>
 

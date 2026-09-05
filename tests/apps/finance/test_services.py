@@ -26,6 +26,7 @@ from apps.finance.services import (
     record_transaction,
     resolve_transaction,
     shift_month,
+    total_debt,
     update_transaction,
 )
 
@@ -514,6 +515,28 @@ class OutstandingCreditCardTests(TestCase):
         balances = {row['credit_card']: row['outstanding'] for row in outstanding_credit_cards()}
 
         self.assertEqual(balances[self.card], Decimal('3000'))
+
+
+class TotalDebtTests(TestCase):
+    def setUp(self):
+        self.food = Category.objects.create(name='Food', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+
+    def test_combines_outstanding_loans_and_credit_cards(self):
+        loan = Loan.objects.create(lender_name='Bank', principal=Decimal('10000'), disbursed_at=timezone.now().date())
+        record_loan_payment(loan_id=str(loan.pk), amount_raw='4000')
+
+        card_account = Account.objects.create(name='HDFC Card', account_type=Account.AccountType.CREDIT_CARD, is_active=True)
+        card = CreditCard.objects.create(account=card_account, credit_limit=Decimal('50000'), billing_day=1, due_day=15)
+        Transaction.objects.create(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=Decimal('2500'), category=self.food, account=card_account, transaction_at=timezone.now(),
+        )
+
+        self.assertEqual(total_debt(), Decimal('6000') + Decimal('2500'))
+
+    def test_is_zero_with_no_loans_or_cards(self):
+        self.assertEqual(total_debt(), Decimal('0'))
 
 
 class DashboardSummaryReimbursementTests(TestCase):

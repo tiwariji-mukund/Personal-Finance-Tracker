@@ -589,8 +589,8 @@ Do not design this schema prematurely. Design it when this milestone begins.
 
 - [x] Task 8.17 — Add outstanding loan summary
 - [x] Task 8.18 — Add credit-card outstanding summary
-- [ ] Task 8.19 — Add unified financial overview
-- [ ] Task 8.20 — Verify financial calculations
+- [x] Task 8.19 — Add unified financial overview
+- [x] Task 8.20 — Verify financial calculations
 
 ---
 

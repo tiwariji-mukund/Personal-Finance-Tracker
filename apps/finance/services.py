@@ -246,6 +246,13 @@ def outstanding_credit_cards():
     ]
 
 
+def total_debt():
+    """Combined outstanding balance across all loans and credit cards."""
+    loan_total = sum((row['outstanding'] for row in outstanding_loans()), Decimal('0'))
+    card_total = sum((row['outstanding'] for row in outstanding_credit_cards()), Decimal('0'))
+    return loan_total + card_total
+
+
 def resolve_transaction(raw_id):
     try:
         transaction_id = int(raw_id)
