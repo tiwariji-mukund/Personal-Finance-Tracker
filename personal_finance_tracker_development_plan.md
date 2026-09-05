@@ -502,7 +502,7 @@ Keep the UX simple and fast because this is primarily a personal tracker.
 ## Trends
 
 - [x] Task 6.12 — Add monthly spending trend
-- [ ] Task 6.13 — Add category trend where useful
+- [x] Task 6.13 — Add category trend where useful
 - [x] Task 6.14 — Add recent transactions
 - [x] Task 6.15 — Optimize dashboard queries if needed
 - [x] Task 6.16 — Add dashboard tests

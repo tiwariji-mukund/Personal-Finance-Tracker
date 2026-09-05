@@ -293,6 +293,21 @@ class DashboardSummaryTests(TestCase):
         self.assertEqual(len(summary['category_breakdown']), 1)
         self.assertEqual(summary['category_breakdown'][0]['total'], Decimal('300'))
 
+    def test_change_pct_compares_against_the_previous_month(self):
+        self._create(Transaction.TransactionType.EXPENSE, '200', self.food, (2026, 2, 10))
+        self._create(Transaction.TransactionType.EXPENSE, '300', self.food, (2026, 3, 10))
+
+        food_row = next(row for row in dashboard_summary(2026, 3)['category_breakdown'] if row['name'] == 'Food')
+
+        self.assertEqual(food_row['change_pct'], Decimal('50'))
+
+    def test_change_pct_is_none_with_no_prior_month_spend(self):
+        self._create(Transaction.TransactionType.EXPENSE, '300', self.food, (2026, 3, 10))
+
+        food_row = next(row for row in dashboard_summary(2026, 3)['category_breakdown'] if row['name'] == 'Food')
+
+        self.assertIsNone(food_row['change_pct'])
+
     def test_recent_transactions_are_capped_at_the_history_limit(self):
         for day in range(1, TRANSACTION_HISTORY_LIMIT + 4):
             self._create(Transaction.TransactionType.EXPENSE, '10', self.food, (2026, 3, day))

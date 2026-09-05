@@ -92,6 +92,10 @@
   .legend .name { flex: 1; }
   .legend .pct { color: var(--muted); width: 48px; text-align: right; }
   .legend .amt { width: 100px; text-align: right; }
+  .legend .change { width: 56px; text-align: right; font-size: 0.8rem; }
+  .legend .change.up { color: var(--expense); }
+  .legend .change.down { color: var(--income); }
+  .legend .change.flat { color: var(--muted); }
   .empty { color: var(--muted); font-size: 0.9rem; }
   .trend { display: flex; align-items: flex-end; gap: 18px; height: 160px; }
   .trend-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; height: 100%; }
@@ -159,6 +163,9 @@
               <span class="name">{{ row.icon }} {{ row.name }}</span>
               <span class="pct">{{ row.percentage|floatformat:1 }}%</span>
               <span class="amt">₹{{ row.total|floatformat:2 }}</span>
+              <span class="change {% if row.change_pct is None %}flat{% elif row.change_pct > 0 %}up{% else %}down{% endif %}" title="vs last month">
+                {% if row.change_pct is None %}—{% else %}{% if row.change_pct > 0 %}▲{% else %}▼{% endif %} {{ row.change_pct|floatformat:0|cut:"-" }}%{% endif %}
+              </span>
             </li>
           {% endfor %}
         </ul>

@@ -202,6 +202,18 @@ def _month_bounds(year, month):
     return start, end
 
 
+def _category_expense_totals(year, month):
+    start, end = _month_bounds(year, month)
+    rows = (
+        Transaction.objects.filter(
+            transaction_at__gte=start, transaction_at__lt=end, transaction_type=Transaction.TransactionType.EXPENSE
+        )
+        .values('category__name')
+        .annotate(total=Sum('amount'))
+    )
+    return {(row['category__name'] or 'Uncategorized'): row['total'] for row in rows}
+
+
 def dashboard_summary(year, month):
     start, end = _month_bounds(year, month)
     transactions = Transaction.objects.filter(transaction_at__gte=start, transaction_at__lt=end)
@@ -229,16 +241,20 @@ def dashboard_summary(year, month):
         .annotate(total=Sum('amount'))
         .order_by('-total')
     )
-    category_breakdown = [
-        {
-            'name': row['category__name'] or 'Uncategorized',
+    prev_totals = _category_expense_totals(*shift_month(year, month, -1))
+    category_breakdown = []
+    for row in category_rows:
+        name = row['category__name'] or 'Uncategorized'
+        prev_total = prev_totals.get(name)
+        category_breakdown.append({
+            'name': name,
             'icon': row['category__icon'] or '',
             'color': row['category__color'] or '#6B7280',
             'total': row['total'],
             'percentage': (row['total'] / expenses * 100) if expenses else Decimal('0'),
-        }
-        for row in category_rows
-    ]
+            # None means "no spend last month to compare against" (new category, or first month).
+            'change_pct': (row['total'] - prev_total) / prev_total * 100 if prev_total else None,
+        })
 
     return {
         'income': income,
