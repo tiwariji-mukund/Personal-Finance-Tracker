@@ -7,6 +7,10 @@ from constants import (
     BOT_COMMANDS,
     CALLBACK_PREFIX_ACCOUNT,
     CALLBACK_PREFIX_CATEGORY,
+    CALLBACK_PREFIX_OWED_ALL,
+    CALLBACK_PREFIX_SHARED_CANCEL,
+    CALLBACK_PREFIX_SHARED_CONFIRM,
+    CALLBACK_PREFIX_SHARED_DESC_SKIP,
     PENDING_ACTION_DELETE_ID,
     PENDING_ACTION_DESCRIPTION,
     PENDING_ACTION_EDIT_DETAILS,
@@ -16,24 +20,43 @@ from constants import (
 )
 
 from apps.finance.models import Account, Category, Person, Transaction
+from apps.finance.services import outstanding_for_person
 from apps.telegram_bot.commands import (
     _PENDING_PROMPTS,
+    build_borrowers_message,
     build_owed_message,
     build_transaction_history_message,
     handle_account_selected,
+    handle_add_borrower_command,
     handle_category_selected,
     handle_delete_command,
     handle_description_skipped,
     handle_edit_command,
+    handle_owed_all_selected,
+    handle_owed_command,
+    handle_owed_person_selected,
     handle_plain_message,
+    handle_remove_borrower_cancelled,
+    handle_remove_borrower_command,
+    handle_remove_borrower_confirmed,
+    handle_remove_borrower_picked,
+    handle_settle_cancelled,
     handle_settle_command,
+    handle_settle_confirmed,
+    handle_settle_person_selected,
+    handle_shared_borrower_toggled,
+    handle_shared_borrowers_done,
+    handle_shared_cancelled,
+    handle_shared_category_selected,
     handle_shared_command,
+    handle_shared_confirmed,
+    handle_shared_description_skipped,
     handle_transaction_command,
 )
 
 IMPLEMENTED_COMMANDS = {
     'start', 'help', 'expense', 'income', 'invest', 'transactions', 'edit', 'delete',
-    'shared', 'settle', 'owed',
+    'shared', 'settle', 'owed', 'borrowers', 'addborrower', 'removeborrower',
 }
 CHAT_ID = TEST_CHAT_ID
 
@@ -562,6 +585,59 @@ class HandleSharedCommandTests(TestCase):
         self.assertFalse(Transaction.objects.exists())
         self.assertTrue(reply.startswith('❌'))
 
+    def test_duplicate_person_returns_error_without_creating_transaction(self):
+        reply = handle_shared_command('/shared 100 rent alice:30 alice:20')
+
+        self.assertFalse(Transaction.objects.exists())
+        self.assertTrue(reply.startswith('❌'))
+
+    def test_single_person_share_leaves_the_rest_as_the_users_own_expense(self):
+        reply = handle_shared_command('/shared 25000 rent alice:5000')
+
+        transaction = Transaction.objects.get()
+        self.assertEqual(transaction.amount, Decimal('25000'))
+        share = transaction.shares.get()
+        self.assertEqual(share.person, self.alice)
+        self.assertEqual(share.amount, Decimal('5000'))
+        self.assertIn('Alice', reply)
+
+    def test_malformed_tokens_are_rejected_instead_of_silently_becoming_the_description(self):
+        reply = handle_shared_command('/shared 1200 rent alice')
+
+        self.assertFalse(Transaction.objects.exists())
+        self.assertTrue(reply.startswith('❌'))
+
+    def test_description_words_are_not_mistaken_for_person_shares(self):
+        reply = handle_shared_command('/shared 1200 rent alice:400 bob:300 lunch with the team')
+
+        transaction = Transaction.objects.get()
+        self.assertEqual(transaction.description, 'lunch with the team')
+        self.assertEqual(transaction.shares.count(), 2)
+
+    def test_reusing_an_existing_person_does_not_create_a_duplicate(self):
+        handle_shared_command('/shared 1000 rent alice:400')
+        handle_shared_command('/shared 2000 rent alice:500')
+
+        self.assertEqual(Person.objects.filter(name='Alice').count(), 1)
+        self.assertEqual(Transaction.objects.count(), 2)
+
+    def test_bare_command_launches_the_borrower_picker_instead_of_usage_text(self):
+        result = handle_shared_command('/shared')
+
+        self.assertIsInstance(result, tuple)
+        prompt, markup = result
+        self.assertNotIn('Usage', prompt)
+        button_texts = {b.text for row in markup.inline_keyboard for b in row}
+        self.assertEqual(button_texts, {'Alice', 'Bob', '✅ Done', '❌ Cancel'})
+
+    def test_bare_command_with_no_borrowers_suggests_addborrower(self):
+        Person.objects.all().delete()
+
+        result = handle_shared_command('/shared')
+
+        self.assertIsInstance(result, str)
+        self.assertIn('/addborrower', result)
+
 
 class HandleSettleCommandTests(TestCase):
     def setUp(self):
@@ -609,3 +685,444 @@ class BuildOwedMessageTests(TestCase):
 
         self.assertIn('Alice', message)
         self.assertIn('400', message)
+
+
+def _select_borrowers(chat_id, people):
+    """Simulates tapping each of `people`'s buttons on the /shared borrower
+    picker in turn, then Done — mirroring how the real toggle buttons
+    accumulate the selected-id list in their callback_data."""
+    selected = set()
+    for person in people:
+        csv = ','.join(str(i) for i in sorted(selected))
+        handle_shared_borrower_toggled(f'shb|{csv}|{person.pk}', chat_id)
+        selected.add(person.pk)
+    csv = ','.join(str(i) for i in sorted(selected))
+    return handle_shared_borrowers_done(f'shdone|{csv}', chat_id)
+
+
+class BorrowerManagementCommandTests(TestCase):
+    def setUp(self):
+        _PENDING_PROMPTS.clear()
+        self.rent = Category.objects.create(name='Rent', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+
+    def test_adding_a_new_borrower(self):
+        reply = handle_add_borrower_command(CHAT_ID, '/addborrower Alice')
+
+        self.assertEqual(Person.objects.filter(name='Alice', is_active=True).count(), 1)
+        self.assertIn('Alice', reply)
+        self.assertTrue(reply.startswith('✅'))
+
+    def test_adding_a_duplicate_borrower_does_not_create_a_second_row(self):
+        Person.objects.create(name='Alice', is_active=True)
+
+        reply = handle_add_borrower_command(CHAT_ID, '/addborrower Alice')
+
+        self.assertEqual(Person.objects.filter(name__iexact='alice').count(), 1)
+        self.assertIn('already exists', reply)
+        self.assertTrue(reply.startswith('⚠️'))
+
+    def test_bare_addborrower_prompts_then_the_next_reply_adds_the_name(self):
+        reply = handle_add_borrower_command(CHAT_ID, '/addborrower')
+
+        self.assertFalse(Person.objects.exists())
+        self.assertIn('name', reply.lower())
+
+        reply = handle_plain_message(CHAT_ID, 'Alice')
+
+        self.assertEqual(Person.objects.filter(name='Alice').count(), 1)
+        self.assertTrue(reply.startswith('✅'))
+
+    def test_build_borrowers_message_lists_active_borrowers_with_balances(self):
+        Person.objects.create(name='Alice', is_active=True)
+        handle_add_borrower_command(CHAT_ID, '/addborrower Bob')
+        handle_shared_command('/shared 1000 rent alice:400')
+
+        message = build_borrowers_message()
+
+        self.assertIn('Alice', message)
+        self.assertIn('400', message)
+        self.assertIn('Bob', message)
+
+    def test_build_borrowers_message_with_no_borrowers_suggests_addborrower(self):
+        message = build_borrowers_message()
+
+        self.assertIn('/addborrower', message)
+
+    def test_remove_borrower_deactivates_and_preserves_history(self):
+        alice = Person.objects.create(name='Alice', is_active=True)
+        handle_shared_command('/shared 1000 rent alice:400')
+
+        pick_result = handle_remove_borrower_command('/removeborrower')
+        _, markup = pick_result
+        pick_btn = next(b for row in markup.inline_keyboard for b in row if b.text == 'Alice')
+
+        confirm_result = handle_remove_borrower_picked(pick_btn.callback_data, CHAT_ID)
+        message, markup = confirm_result
+        self.assertIn('1 historical shared expense', message)
+        confirm_btn = next(b for row in markup.inline_keyboard for b in row if b.text == 'Remove')
+
+        reply = handle_remove_borrower_confirmed(confirm_btn.callback_data, CHAT_ID)
+
+        alice.refresh_from_db()
+        self.assertFalse(alice.is_active)
+        self.assertTrue(reply.startswith('✅'))
+        # historical shared expense is untouched
+        self.assertEqual(alice.shares.count(), 1)
+
+    def test_remove_borrower_cancel_leaves_the_borrower_active(self):
+        alice = Person.objects.create(name='Alice', is_active=True)
+
+        reply = handle_remove_borrower_cancelled(f'rmbrwno', CHAT_ID)
+
+        alice.refresh_from_db()
+        self.assertTrue(alice.is_active)
+        self.assertIn('Cancelled', reply)
+
+    def test_removed_borrower_does_not_appear_in_the_shared_picker(self):
+        Person.objects.create(name='Alice', is_active=False)
+        Person.objects.create(name='Bob', is_active=True)
+
+        _, markup = handle_shared_command('/shared')
+
+        button_texts = {b.text for row in markup.inline_keyboard for b in row}
+        self.assertNotIn('Alice', button_texts)
+        self.assertIn('Bob', button_texts)
+
+    def test_remove_borrower_with_no_active_borrowers(self):
+        reply = handle_remove_borrower_command('/removeborrower')
+
+        self.assertIsInstance(reply, str)
+        self.assertIn("don't have any borrowers", reply)
+
+
+class SharedInteractiveFlowTests(TestCase):
+    def setUp(self):
+        _PENDING_PROMPTS.clear()
+        self.rent = Category.objects.create(name='Rent', is_active=True, category_type=Category.CategoryType.EXPENSE)
+        self.mutual_fund = Category.objects.create(
+            name='MutualFund', is_active=True, category_type=Category.CategoryType.TRANSFER
+        )
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+        self.bob = Person.objects.create(name='Bob', is_active=True)
+
+    def _pick_category(self, chat_id, category):
+        pending = _PENDING_PROMPTS[chat_id]
+        self.assertEqual(pending[0], 'SHARED_CATEGORY')
+        return handle_shared_category_selected(f'shcat|{category.pk}', chat_id)
+
+    def test_toggling_a_borrower_twice_deselects_them(self):
+        _, markup = handle_shared_borrower_toggled('shb||1', CHAT_ID)
+        alice_btn = next(b for row in markup.inline_keyboard for b in row if 'Alice' in b.text)
+        self.assertTrue(alice_btn.text.startswith('✓'))
+
+        _, markup = handle_shared_borrower_toggled(alice_btn.callback_data, CHAT_ID)
+        alice_btn = next(b for row in markup.inline_keyboard for b in row if b.text == 'Alice')
+        self.assertFalse(alice_btn.text.startswith('✓'))
+
+    def test_done_with_no_selection_returns_error_and_keeps_the_picker_open(self):
+        reply, markup = handle_shared_borrowers_done('shdone|', CHAT_ID)
+
+        self.assertTrue(reply.startswith('❌'))
+        self.assertIsInstance(markup, type(markup))
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+    def test_done_with_selection_prompts_for_the_amount(self):
+        reply = _select_borrowers(CHAT_ID, [self.alice, self.bob])
+
+        self.assertEqual(reply, '💰 How much did you pay in total?')
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_AMOUNT')
+        self.assertEqual(set(_PENDING_PROMPTS[CHAT_ID][1]), {self.alice.pk, self.bob.pk})
+
+    def test_invalid_amount_keeps_the_flow_alive_for_a_retry(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+
+        reply = handle_plain_message(CHAT_ID, 'not-a-number')
+
+        self.assertTrue(reply.startswith('❌'))
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_AMOUNT')
+
+        # the chat can now retry with a valid amount
+        reply = handle_plain_message(CHAT_ID, '25000')
+        self.assertIn('category', reply[0].lower())
+
+    def test_amount_leads_to_a_category_picker_restricted_to_expense_categories(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+
+        _, markup = handle_plain_message(CHAT_ID, '25000')
+
+        button_texts = {b.text for row in markup.inline_keyboard for b in row}
+        self.assertIn('Rent', button_texts)
+        self.assertNotIn('MutualFund', button_texts)
+
+    def test_stale_category_callback_is_rejected(self):
+        reply = handle_shared_category_selected(f'shcat|{self.rent.pk}', CHAT_ID)
+
+        self.assertIn('no longer valid', reply)
+        self.assertFalse(Transaction.objects.exists())
+
+    def test_category_selection_prompts_for_the_first_borrowers_share(self):
+        _select_borrowers(CHAT_ID, [self.alice, self.bob])
+        handle_plain_message(CHAT_ID, '25000')
+
+        reply = self._pick_category(CHAT_ID, self.rent)
+
+        self.assertIn("Alice", reply)
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_SHARE')
+
+    def test_invalid_share_keeps_prompting_for_the_same_borrower(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+        handle_plain_message(CHAT_ID, '25000')
+        self._pick_category(CHAT_ID, self.rent)
+
+        reply = handle_plain_message(CHAT_ID, 'not-a-number')
+
+        self.assertTrue(reply.startswith('❌'))
+        self.assertIn('Alice', reply)
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_SHARE')
+
+    def test_shares_move_to_the_next_borrower_in_turn(self):
+        _select_borrowers(CHAT_ID, [self.alice, self.bob])
+        handle_plain_message(CHAT_ID, '25000')
+        self._pick_category(CHAT_ID, self.rent)
+
+        reply = handle_plain_message(CHAT_ID, '5000')
+
+        self.assertIn('Bob', reply)
+
+    def test_shares_exceeding_the_total_restart_share_entry(self):
+        _select_borrowers(CHAT_ID, [self.alice, self.bob])
+        handle_plain_message(CHAT_ID, '100')
+        self._pick_category(CHAT_ID, self.rent)
+        handle_plain_message(CHAT_ID, '60')
+
+        reply = handle_plain_message(CHAT_ID, '60')
+
+        self.assertTrue(reply.startswith('❌'))
+        self.assertIn('Please enter the shares again', reply)
+        self.assertIn('Alice', reply)
+        pending = _PENDING_PROMPTS[CHAT_ID]
+        self.assertEqual(pending[0], 'SHARED_SHARE')
+        self.assertEqual(pending[4], ())  # collected shares were reset
+
+        # can now re-enter valid shares
+        handle_plain_message(CHAT_ID, '30')
+        reply = handle_plain_message(CHAT_ID, '30')
+        self.assertIn('description', reply[0].lower())
+
+    def test_shares_exactly_equal_to_the_total_leave_no_personal_share(self):
+        _select_borrowers(CHAT_ID, [self.alice, self.bob])
+        handle_plain_message(CHAT_ID, '100')
+        self._pick_category(CHAT_ID, self.rent)
+        handle_plain_message(CHAT_ID, '50')
+        handle_plain_message(CHAT_ID, '50')
+
+        skip_result = handle_shared_description_skipped(CALLBACK_PREFIX_SHARED_DESC_SKIP, CHAT_ID)
+        message, markup = skip_result
+        self.assertIn('Your share: ₹0.00', message)
+
+        confirm_btn = next(b for row in markup.inline_keyboard for b in row if 'Confirm' in b.text)
+        handle_shared_confirmed(confirm_btn.callback_data, CHAT_ID)
+
+        transaction = Transaction.objects.get()
+        self.assertEqual(transaction.amount - sum(s.amount for s in transaction.shares.all()), Decimal('0'))
+
+    def test_description_via_text_reply_reaches_the_confirmation_screen(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+        handle_plain_message(CHAT_ID, '25000')
+        self._pick_category(CHAT_ID, self.rent)
+        handle_plain_message(CHAT_ID, '5000')
+
+        reply = handle_plain_message(CHAT_ID, 'monthly rent')
+
+        message, markup = reply
+        self.assertIn('monthly rent', message)
+        self.assertIn('Your share: ₹20,000.00', message)
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_CONFIRM')
+
+    def test_confirm_creates_the_transaction_with_the_correct_split(self):
+        _select_borrowers(CHAT_ID, [self.alice, self.bob])
+        handle_plain_message(CHAT_ID, '25000')
+        self._pick_category(CHAT_ID, self.rent)
+        handle_plain_message(CHAT_ID, '5000')
+        handle_plain_message(CHAT_ID, '5000')
+        _, markup = handle_plain_message(CHAT_ID, 'monthly rent')
+        confirm_btn = next(b for row in markup.inline_keyboard for b in row if 'Confirm' in b.text)
+
+        reply = handle_shared_confirmed(confirm_btn.callback_data, CHAT_ID)
+
+        transaction = Transaction.objects.get()
+        self.assertEqual(transaction.amount, Decimal('25000'))
+        self.assertEqual(transaction.category, self.rent)
+        self.assertEqual(transaction.description, 'monthly rent')
+        shares = {share.person: share.amount for share in transaction.shares.all()}
+        self.assertEqual(shares, {self.alice: Decimal('5000'), self.bob: Decimal('5000')})
+        self.assertIn('Your expense: ₹15,000.00', reply)
+        self.assertIn('Amount owed to you: ₹10,000.00', reply)
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+    def test_cancel_at_the_borrower_stage_creates_nothing(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+
+        reply = handle_shared_cancelled(CALLBACK_PREFIX_SHARED_CANCEL, CHAT_ID)
+
+        self.assertEqual(reply, '❌ Shared expense cancelled.')
+        self.assertFalse(Transaction.objects.exists())
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+    def test_cancel_at_the_confirmation_stage_creates_nothing(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+        handle_plain_message(CHAT_ID, '25000')
+        self._pick_category(CHAT_ID, self.rent)
+        handle_plain_message(CHAT_ID, '5000')
+        handle_shared_description_skipped(CALLBACK_PREFIX_SHARED_DESC_SKIP, CHAT_ID)
+
+        reply = handle_shared_cancelled(CALLBACK_PREFIX_SHARED_CANCEL, CHAT_ID)
+
+        self.assertEqual(reply, '❌ Shared expense cancelled.')
+        self.assertFalse(Transaction.objects.exists())
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+    def test_stale_confirm_callback_after_cancel_is_rejected(self):
+        reply = handle_shared_confirmed(CALLBACK_PREFIX_SHARED_CONFIRM, CHAT_ID)
+
+        self.assertIn('no longer valid', reply)
+        self.assertFalse(Transaction.objects.exists())
+
+    def test_borrower_removed_mid_flow_aborts_before_confirmation(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+        handle_plain_message(CHAT_ID, '25000')
+        self.alice.is_active = False
+        self.alice.save(update_fields=['is_active'])
+
+        reply = self._pick_category(CHAT_ID, self.rent)
+
+        self.assertIn('no longer available', reply)
+        self.assertFalse(Transaction.objects.exists())
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+    def test_a_stray_text_reply_during_a_button_only_stage_does_not_crash(self):
+        _select_borrowers(CHAT_ID, [self.alice])
+        handle_plain_message(CHAT_ID, '25000')  # now awaiting a category button tap
+
+        reply = handle_plain_message(CHAT_ID, 'some random text')
+
+        self.assertIn('buttons', reply.lower())
+        # the category picker is still usable afterwards
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID][0], 'SHARED_CATEGORY')
+
+
+class SettleInteractiveFlowTests(TestCase):
+    def setUp(self):
+        _PENDING_PROMPTS.clear()
+        self.rent = Category.objects.create(name='Rent', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+        handle_shared_command('/shared 1000 rent alice:400')
+
+    def test_bare_settle_with_no_borrowers_suggests_addborrower(self):
+        Person.objects.update(is_active=False)  # Alice has a protected share, so deactivate rather than delete
+
+        reply = handle_settle_command('/settle')
+
+        self.assertIsInstance(reply, str)
+        self.assertIn('/addborrower', reply)
+
+    def test_bare_settle_shows_a_borrower_picker(self):
+        _, markup = handle_settle_command('/settle')
+
+        button_texts = {b.text for row in markup.inline_keyboard for b in row}
+        self.assertIn('Alice', button_texts)
+
+    def test_selecting_a_borrower_shows_their_outstanding_balance_and_asks_for_the_amount(self):
+        _, markup = handle_settle_command('/settle')
+        btn = next(b for row in markup.inline_keyboard for b in row if b.text == 'Alice')
+
+        reply = handle_settle_person_selected(btn.callback_data, CHAT_ID)
+
+        self.assertIn('400', reply)
+        self.assertEqual(_PENDING_PROMPTS[CHAT_ID], ('SETTLE_AMOUNT', self.alice.pk))
+
+    def test_amount_reply_shows_a_confirmation_with_the_remaining_balance(self):
+        handle_settle_person_selected(f'stlp|{self.alice.pk}', CHAT_ID)
+
+        message, markup = handle_plain_message(CHAT_ID, '150')
+
+        self.assertIn('Remaining: ₹250.00', message)
+        confirm_btn = next(b for row in markup.inline_keyboard for b in row if 'Confirm' in b.text)
+        self.assertEqual(confirm_btn.callback_data, f'stlconfirm|{self.alice.pk}|150')
+
+    def test_confirm_creates_the_settlement_transaction(self):
+        handle_settle_person_selected(f'stlp|{self.alice.pk}', CHAT_ID)
+        handle_plain_message(CHAT_ID, '150')
+
+        reply = handle_settle_confirmed(f'stlconfirm|{self.alice.pk}|150', CHAT_ID)
+
+        transaction = Transaction.objects.get(transaction_type=Transaction.TransactionType.SETTLEMENT)
+        self.assertEqual(transaction.amount, Decimal('150'))
+        self.assertEqual(transaction.person, self.alice)
+        self.assertEqual(outstanding_for_person(self.alice), Decimal('250'))
+        self.assertIn('150', reply)
+
+    def test_full_repayment_zeroes_the_outstanding_balance(self):
+        handle_settle_person_selected(f'stlp|{self.alice.pk}', CHAT_ID)
+        handle_plain_message(CHAT_ID, '400')
+
+        handle_settle_confirmed(f'stlconfirm|{self.alice.pk}|400', CHAT_ID)
+
+        self.assertEqual(outstanding_for_person(self.alice), Decimal('0'))
+
+    def test_cancel_creates_no_settlement(self):
+        handle_settle_person_selected(f'stlp|{self.alice.pk}', CHAT_ID)
+        handle_plain_message(CHAT_ID, '150')
+
+        reply = handle_settle_cancelled(CALLBACK_PREFIX_SHARED_CANCEL, CHAT_ID)
+
+        self.assertFalse(Transaction.objects.filter(transaction_type=Transaction.TransactionType.SETTLEMENT).exists())
+        self.assertIn('cancelled', reply.lower())
+        self.assertNotIn(CHAT_ID, _PENDING_PROMPTS)
+
+
+class OwedInteractiveFlowTests(TestCase):
+    def setUp(self):
+        _PENDING_PROMPTS.clear()
+        self.rent = Category.objects.create(name='Rent', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+        self.bob = Person.objects.create(name='Bob', is_active=True)
+
+    def test_no_borrowers_suggests_addborrower(self):
+        Person.objects.all().delete()
+
+        reply = handle_owed_command('/owed')
+
+        self.assertIsInstance(reply, str)
+        self.assertIn('/addborrower', reply)
+
+    def test_shows_a_picker_with_an_all_option(self):
+        _, markup = handle_owed_command('/owed')
+
+        button_texts = {b.text for row in markup.inline_keyboard for b in row}
+        self.assertEqual(button_texts, {'Alice', 'Bob', 'All'})
+
+    def test_selecting_a_borrower_shows_their_balance(self):
+        handle_shared_command('/shared 1000 rent alice:400')
+
+        reply = handle_owed_person_selected(f'owedp|{self.alice.pk}', CHAT_ID)
+
+        self.assertIn('Alice', reply)
+        self.assertIn('400', reply)
+
+    def test_selecting_a_borrower_with_no_outstanding_balance(self):
+        reply = handle_owed_person_selected(f'owedp|{self.bob.pk}', CHAT_ID)
+
+        self.assertIn('₹0.00', reply)
+
+    def test_all_selection_matches_the_non_interactive_summary(self):
+        handle_shared_command('/shared 1000 rent alice:400')
+
+        reply = handle_owed_all_selected(CALLBACK_PREFIX_OWED_ALL, CHAT_ID)
+
+        self.assertEqual(reply, build_owed_message())
+        self.assertIn('Alice', reply)

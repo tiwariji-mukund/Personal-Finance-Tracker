@@ -9,7 +9,11 @@ from constants import MAX_TRANSACTION_AMOUNT, TRANSACTION_HISTORY_LIMIT
 from apps.finance.models import Account, Category, CreditCard, Loan, Person, Transaction, TransactionShare
 from apps.finance.services import (
     TransactionInputError,
+    active_people,
+    add_borrower,
+    borrower_share_count,
     dashboard_summary,
+    deactivate_borrower,
     delete_transaction,
     monthly_trend,
     outstanding_balances,
@@ -23,7 +27,9 @@ from apps.finance.services import (
     record_loan_payment,
     record_settlement,
     record_shared_expense,
+    record_shared_expense_for_people,
     record_transaction,
+    resolve_active_person,
     resolve_transaction,
     shift_month,
     total_debt,
@@ -369,6 +375,156 @@ class RecordSharedExpenseTests(TestCase):
             )
 
         self.assertFalse(Transaction.objects.exists())
+
+    def test_rejects_the_same_person_listed_twice(self):
+        with self.assertRaises(TransactionInputError):
+            record_shared_expense(
+                amount_raw='100',
+                category_name='rent',
+                shares_raw=[('alice', '30'), ('alice', '20')],
+            )
+
+        self.assertFalse(Transaction.objects.exists())
+
+    def test_rejects_the_same_person_listed_twice_case_insensitively(self):
+        with self.assertRaises(TransactionInputError):
+            record_shared_expense(
+                amount_raw='100',
+                category_name='rent',
+                shares_raw=[('alice', '30'), ('ALICE', '20')],
+            )
+
+        self.assertFalse(Transaction.objects.exists())
+
+
+class RecordSharedExpenseForPeopleTests(TestCase):
+    """Covers the Telegram borrower-picker's entry point, which passes
+    already-resolved Person objects instead of names — used instead of
+    record_shared_expense so the picker never needs a text-based lookup."""
+
+    def setUp(self):
+        self.rent = Category.objects.create(name='Rent', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+        self.bob = Person.objects.create(name='Bob', is_active=True)
+
+    def test_creates_expense_with_shares_for_each_person(self):
+        transaction = record_shared_expense_for_people(
+            amount_raw='25000',
+            category=self.rent,
+            people_shares=[(self.alice, '5000'), (self.bob, '5000')],
+            description='monthly rent',
+        )
+
+        self.assertEqual(transaction.amount, Decimal('25000'))
+        self.assertEqual(transaction.category, self.rent)
+        shares = {share.person: share.amount for share in transaction.shares.all()}
+        self.assertEqual(shares, {self.alice: Decimal('5000'), self.bob: Decimal('5000')})
+
+    def test_rejects_shares_exceeding_the_total_amount(self):
+        with self.assertRaises(TransactionInputError):
+            record_shared_expense_for_people(
+                amount_raw='100', category=self.rent, people_shares=[(self.alice, '60'), (self.bob, '60')]
+            )
+
+        self.assertFalse(Transaction.objects.exists())
+
+    def test_rejects_the_same_person_listed_twice_with_no_partial_write(self):
+        with self.assertRaises(TransactionInputError):
+            record_shared_expense_for_people(
+                amount_raw='100', category=self.rent, people_shares=[(self.alice, '30'), (self.alice, '20')]
+            )
+
+        self.assertFalse(Transaction.objects.exists())
+
+
+class AddBorrowerTests(TestCase):
+    def test_creates_a_new_borrower(self):
+        person, created = add_borrower('Alice')
+
+        self.assertTrue(created)
+        self.assertEqual(person.name, 'Alice')
+        self.assertTrue(person.is_active)
+
+    def test_adding_an_existing_active_borrower_is_a_no_op_not_a_duplicate(self):
+        Person.objects.create(name='Alice', is_active=True)
+
+        person, created = add_borrower('Alice')
+
+        self.assertFalse(created)
+        self.assertEqual(person.name, 'Alice')
+        self.assertEqual(Person.objects.filter(name__iexact='alice').count(), 1)
+
+    def test_adding_matches_an_existing_borrower_case_insensitively(self):
+        Person.objects.create(name='Alice', is_active=True)
+
+        person, created = add_borrower('ALICE')
+
+        self.assertFalse(created)
+        self.assertEqual(Person.objects.count(), 1)
+
+    def test_reactivates_a_previously_removed_borrower_instead_of_erroring(self):
+        removed = Person.objects.create(name='Alice', is_active=False)
+
+        person, created = add_borrower('Alice')
+
+        self.assertTrue(created)
+        self.assertEqual(person.pk, removed.pk)
+        self.assertTrue(Person.objects.get(pk=removed.pk).is_active)
+        self.assertEqual(Person.objects.count(), 1)
+
+    def test_rejects_an_empty_name(self):
+        with self.assertRaises(TransactionInputError):
+            add_borrower('   ')
+
+        self.assertFalse(Person.objects.exists())
+
+
+class DeactivateBorrowerTests(TestCase):
+    def setUp(self):
+        self.rent = Category.objects.create(name='Rent', is_active=True)
+        self.account = Account.objects.create(name='Cash', is_active=True)
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+
+    def test_marks_the_borrower_inactive(self):
+        deactivate_borrower(self.alice)
+
+        self.alice.refresh_from_db()
+        self.assertFalse(self.alice.is_active)
+
+    def test_inactive_borrower_is_excluded_from_active_people(self):
+        deactivate_borrower(self.alice)
+
+        self.assertNotIn(self.alice, list(active_people()))
+
+    def test_historical_shares_and_outstanding_balance_survive_deactivation(self):
+        record_shared_expense_for_people(amount_raw='1000', category=self.rent, people_shares=[(self.alice, '400')])
+
+        deactivate_borrower(self.alice)
+
+        self.assertEqual(outstanding_for_person(self.alice), Decimal('400'))
+        self.assertEqual(borrower_share_count(self.alice), 1)
+
+
+class ResolveActivePersonTests(TestCase):
+    def setUp(self):
+        self.alice = Person.objects.create(name='Alice', is_active=True)
+        self.bob = Person.objects.create(name='Bob', is_active=False)
+
+    def test_resolves_an_active_borrower_by_id(self):
+        self.assertEqual(resolve_active_person(self.alice.pk), self.alice)
+
+    def test_rejects_an_inactive_borrower(self):
+        with self.assertRaises(TransactionInputError):
+            resolve_active_person(self.bob.pk)
+
+    def test_rejects_an_unknown_id(self):
+        with self.assertRaises(TransactionInputError):
+            resolve_active_person(99999)
+
+    def test_rejects_a_non_numeric_id(self):
+        with self.assertRaises(TransactionInputError):
+            resolve_active_person('not-a-number')
 
 
 class RecordSettlementTests(TestCase):

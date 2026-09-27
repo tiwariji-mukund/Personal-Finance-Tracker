@@ -84,7 +84,58 @@ CALLBACK_PREFIX_CATEGORY = 'cat'
 CALLBACK_PREFIX_ACCOUNT = 'acc'
 CALLBACK_PREFIX_DESCRIPTION_SKIP = 'skip'
 
+# /shared borrower-picker callback_data prefixes. Borrower selection
+# (shb/shdone) bakes the whole selected-id list into callback_data — like
+# the category/account picker above, it stays valid no matter how long the
+# buttons sit unanswered. ponytail: assumes few enough borrowers that the
+# csv list fits Telegram's 64-byte callback_data limit (fine for a personal
+# tracker); move selection state server-side (like the steps below it) if
+# that ever becomes a real constraint.
+# 'shb|<selected_csv>|<toggle_id>', 'shdone|<selected_csv>', 'shcancel'.
+# Category onward needs a plain-text reply in between (amount, each share),
+# so from there the draft lives in _PENDING_PROMPTS instead: 'shcat|<category_id>'
+# picks a category, 'shskip' skips the optional description, 'shconfirm' saves.
+CALLBACK_PREFIX_SHARED_BORROWER = 'shb'
+CALLBACK_PREFIX_SHARED_DONE = 'shdone'
+CALLBACK_PREFIX_SHARED_CANCEL = 'shcancel'
+CALLBACK_PREFIX_SHARED_CATEGORY = 'shcat'
+CALLBACK_PREFIX_SHARED_DESC_SKIP = 'shskip'
+CALLBACK_PREFIX_SHARED_CONFIRM = 'shconfirm'
+
+# /owed borrower-picker: 'owedp|<person_id>' shows one borrower's balance,
+# 'owedall' shows everyone (the old /owed behaviour).
+CALLBACK_PREFIX_OWED_PERSON = 'owedp'
+CALLBACK_PREFIX_OWED_ALL = 'owedall'
+
+# /settle borrower-picker: 'stlp|<person_id>' picks who paid, then (after a
+# plain-text amount reply) 'stlconfirm|<person_id>|<amount>' / 'stlcancel'.
+CALLBACK_PREFIX_SETTLE_PERSON = 'stlp'
+CALLBACK_PREFIX_SETTLE_CONFIRM = 'stlconfirm'
+CALLBACK_PREFIX_SETTLE_CANCEL = 'stlcancel'
+
+# /removeborrower: pick a borrower, confirm (shows their shared-expense
+# history count first), or cancel.
+CALLBACK_PREFIX_REMOVE_BORROWER_PICK = 'rmbrwpick'
+CALLBACK_PREFIX_REMOVE_BORROWER_CONFIRM = 'rmbrwok'
+CALLBACK_PREFIX_REMOVE_BORROWER_CANCEL = 'rmbrwno'
+
 DESCRIPTION_PROMPT = '📝 Add a description, or tap Skip.'
+SHARED_BORROWER_PROMPT = '👥 Who did you pay for? Tap to select, then Done.'
+SHARED_NO_BORROWERS_MESSAGE = (
+    "🤝 You haven't added any borrowers yet.\n"
+    'Add one with /addborrower, then try /shared again.'
+)
+SHARED_AMOUNT_PROMPT = '💰 How much did you pay in total?'
+SHARED_DESCRIPTION_PROMPT = '📝 Add a description, or tap Skip.'
+SHARED_CANCELLED_MESSAGE = '❌ Shared expense cancelled.'
+SETTLE_NO_BORROWERS_MESSAGE = (
+    "🤝 You haven't added any borrowers yet.\n"
+    'Add one with /addborrower, then try /settle again.'
+)
+SETTLE_CANCELLED_MESSAGE = '❌ Settlement cancelled.'
+OWED_NO_BORROWERS_MESSAGE = "🤝 You haven't added any borrowers yet.\nAdd one with /addborrower."
+ADD_BORROWER_PROMPT = "👤 What's the borrower's name?"
+NOT_A_BUTTON_REPLY_MESSAGE = '👆 Please use the buttons above.'
 
 # ponytail: fixed cap, no pagination — add a /transactions <n> argument or
 # paging if a flat recent-N list stops being enough.
@@ -131,6 +182,37 @@ PENDING_ACTION_DELETE_ID = 'DELETE_ID'
 # buttons, awaiting an optional description reply (or a Skip tap).
 PENDING_ACTION_DESCRIPTION = 'DESCRIPTION'
 
+# /shared interactive-flow markers, once borrower selection (handled entirely
+# via callback_data, see CALLBACK_PREFIX_SHARED_BORROWER above) hands off to
+# a step that needs a plain-text reply:
+# (PENDING_ACTION_SHARED_AMOUNT, borrower_ids) — awaiting the total amount.
+# (PENDING_ACTION_SHARED_CATEGORY, borrower_ids, amount_raw) — awaiting a
+#   category button tap (no text expected).
+# (PENDING_ACTION_SHARED_SHARE, amount_raw, category_id, remaining_ids,
+#   done_pairs) — awaiting the next borrower's share; done_pairs is a tuple
+#   of (person_id, share_raw) already collected.
+# (PENDING_ACTION_SHARED_DESCRIPTION, amount_raw, category_id, done_pairs) —
+#   awaiting an optional description reply (or a Skip tap).
+# (PENDING_ACTION_SHARED_CONFIRM, amount_raw, category_id, done_pairs,
+#   description) — awaiting a Confirm/Cancel tap (no text expected).
+PENDING_ACTION_SHARED_AMOUNT = 'SHARED_AMOUNT'
+PENDING_ACTION_SHARED_CATEGORY = 'SHARED_CATEGORY'
+PENDING_ACTION_SHARED_SHARE = 'SHARED_SHARE'
+PENDING_ACTION_SHARED_DESCRIPTION = 'SHARED_DESCRIPTION'
+PENDING_ACTION_SHARED_CONFIRM = 'SHARED_CONFIRM'
+
+# (PENDING_ACTION_SETTLE_AMOUNT, person_id) — awaiting the repayment amount
+# after a borrower is picked for /settle.
+PENDING_ACTION_SETTLE_AMOUNT = 'SETTLE_AMOUNT'
+
+# Awaiting a name reply after a bare /addborrower.
+PENDING_ACTION_ADD_BORROWER_NAME = 'ADD_BORROWER_NAME'
+
+# Pending markers above that are satisfied by a button tap, not free text —
+# a stray text reply during one of these should be reminded to use the
+# buttons instead of being misread as the next step's input.
+CALLBACK_ONLY_PENDING_ACTIONS = {PENDING_ACTION_SHARED_CATEGORY, PENDING_ACTION_SHARED_CONFIRM}
+
 EDIT_ID_PROMPT = '✏️ Which transaction do you want to edit? Reply with its id (see /transactions).'
 DELETE_ID_PROMPT = '🗑️ Which transaction do you want to delete? Reply with its id (see /transactions).'
 
@@ -146,9 +228,12 @@ BOT_COMMANDS = [
     ('transactions', 'View recent transactions'),
     ('edit', 'Edit a transaction'),
     ('delete', 'Delete a transaction'),
-    ('shared', 'Split a shared expense'),
-    ('settle', 'Record a repayment from someone'),
-    ('owed', 'See who owes you money'),
+    ('shared', 'Record a shared expense'),
+    ('settle', 'Record a repayment'),
+    ('owed', 'View money owed to you'),
+    ('borrowers', 'View your borrowers'),
+    ('addborrower', 'Add a borrower'),
+    ('removeborrower', 'Remove a borrower'),
 ]
 
 # --- Test fixtures (tests/) -----------------------------------------------

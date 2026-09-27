@@ -835,34 +835,35 @@ The application should be designed so that future growth is possible without pre
 
 # 14. Current Priority
 
-At the time this plan was created, the immediate priority is:
+Milestones 0–8 are complete and verified. The immediate priority is:
 
 ```text
-Milestone 4
+Milestone 9
     │
-    └── Observability
+    └── AI Financial Analysis
           │
-          ├── Request ID middleware
-          ├── Central Django logging configuration
-          ├── Retrofit application logging
-          ├── Tests
-          └── Final Milestone 4 cleanup
+          ├── Analytics layer (monthly/category aggregations,
+          │   recurring + unusual spending, structured data for AI)
+          ├── Gemini integration
+          ├── Insights & saving recommendations
+          ├── Tests/mocks
+          └── Verify AI output is grounded in actual data
 ```
 
-After Milestone 4 is verified:
+Full order (✅ = done):
 
 ```text
-Telegram transaction input
+Foundation / Domain / Admin / Telegram / Observability  ✅
         ↓
-Transaction experience
+Transaction experience  ✅
         ↓
-Dashboard
+Dashboard  ✅
         ↓
-Reimbursements
+Reimbursements  ✅
         ↓
-Loans / Credit Cards
+Loans / Credit Cards  ✅
         ↓
-AI
+AI  ← current
         ↓
 Multi-user / MySQL
 ```

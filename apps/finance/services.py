@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction as db_transaction
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -103,31 +104,108 @@ def resolve_person(name):
     return person
 
 
-def record_shared_expense(*, amount_raw, category_name, shares_raw, description='', transaction_at=None):
-    """Records an EXPENSE the user paid in full, with one or more people each
-    owing back a share of it (e.g. splitting a rent payment)."""
-    amount = parse_amount(amount_raw)
-    shares = [(resolve_person(name), parse_amount(share_amount_raw)) for name, share_amount_raw in shares_raw]
+def resolve_active_person(raw_id):
+    try:
+        person_id = int(raw_id)
+    except (TypeError, ValueError):
+        raise TransactionInputError(f"'{raw_id}' is not a valid person id.")
 
+    person = Person.objects.filter(pk=person_id, is_active=True).first()
+    if not person:
+        raise TransactionInputError(f'No active borrower found with id {person_id}.')
+
+    return person
+
+
+def add_borrower(name):
+    """Adds a new borrower, or reactivates one that was previously removed —
+    Person.name is unique, so a removed borrower can't be re-created as a
+    second row. Returns (person, created); created is False when an active
+    borrower with this name already exists (a no-op, not an error)."""
+    name = name.strip()
+    if not name:
+        raise TransactionInputError('Borrower name cannot be empty.')
+
+    existing = Person.objects.filter(name__iexact=name).first()
+    if existing and existing.is_active:
+        return existing, False
+    if existing:
+        existing.is_active = True
+        existing.name = name
+        existing.save(update_fields=['is_active', 'name'])
+        return existing, True
+
+    return Person.objects.create(name=name, is_active=True), True
+
+
+def deactivate_borrower(person):
+    """Soft-deletes a borrower: hidden from new shared expenses, but existing
+    TransactionShare/SETTLEMENT records (and outstanding balances) stay intact."""
+    person.is_active = False
+    person.save(update_fields=['is_active'])
+
+
+def borrower_share_count(person):
+    return TransactionShare.objects.filter(person=person).count()
+
+
+def _build_shares(entries):
+    """entries: iterable of (Person, share_amount_raw). Parses each share and
+    rejects the same person appearing twice."""
+    shares = [(person, parse_amount(share_amount_raw)) for person, share_amount_raw in entries]
+
+    people = [person for person, _ in shares]
+    if len(people) != len(set(people)):
+        raise TransactionInputError('Each person can only appear once — combine their shares into a single entry.')
+
+    return shares
+
+
+def _create_shared_expense(*, amount, category, shares, description, transaction_at):
     total_shares = sum((share_amount for _, share_amount in shares), Decimal('0'))
     if total_shares > amount:
         raise TransactionInputError(
             f'Shares (₹{total_shares:,.2f}) cannot exceed the total amount (₹{amount:,.2f}).'
         )
 
-    transaction = create_transaction(
-        transaction_type=Transaction.TransactionType.EXPENSE,
-        amount=amount,
-        category=resolve_category(category_name, Transaction.TransactionType.EXPENSE),
-        account=resolve_default_account(),
-        description=description,
-        transaction_at=transaction_at,
-    )
-    TransactionShare.objects.bulk_create(
-        TransactionShare(transaction=transaction, person=person, amount=share_amount)
-        for person, share_amount in shares
-    )
+    with db_transaction.atomic():
+        transaction = create_transaction(
+            transaction_type=Transaction.TransactionType.EXPENSE,
+            amount=amount,
+            category=category,
+            account=resolve_default_account(),
+            description=description,
+            transaction_at=transaction_at,
+        )
+        TransactionShare.objects.bulk_create(
+            TransactionShare(transaction=transaction, person=person, amount=share_amount)
+            for person, share_amount in shares
+        )
     return transaction
+
+
+def record_shared_expense(*, amount_raw, category_name, shares_raw, description='', transaction_at=None):
+    """Records an EXPENSE the user paid in full, with one or more people each
+    owing back a share of it (e.g. splitting a rent payment). Resolves people
+    by name — kept for the free-text /shared syntax. The Telegram borrower
+    picker instead uses record_shared_expense_for_people with people it has
+    already resolved via inline-keyboard selection."""
+    amount = parse_amount(amount_raw)
+    shares = _build_shares((resolve_person(name), share_amount_raw) for name, share_amount_raw in shares_raw)
+    category = resolve_category(category_name, Transaction.TransactionType.EXPENSE)
+    return _create_shared_expense(
+        amount=amount, category=category, shares=shares, description=description, transaction_at=transaction_at
+    )
+
+
+def record_shared_expense_for_people(*, amount_raw, category, people_shares, description='', transaction_at=None):
+    """Like record_shared_expense, but takes an already-resolved Category and
+    (Person, share_amount_raw) pairs, so no name lookup is needed."""
+    amount = parse_amount(amount_raw)
+    shares = _build_shares(people_shares)
+    return _create_shared_expense(
+        amount=amount, category=category, shares=shares, description=description, transaction_at=transaction_at
+    )
 
 
 def record_settlement(*, person_name, amount_raw, description='', transaction_at=None):

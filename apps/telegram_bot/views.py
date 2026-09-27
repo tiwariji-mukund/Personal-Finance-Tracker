@@ -7,23 +7,54 @@ from constants import (
     CALLBACK_PREFIX_ACCOUNT,
     CALLBACK_PREFIX_CATEGORY,
     CALLBACK_PREFIX_DESCRIPTION_SKIP,
+    CALLBACK_PREFIX_OWED_ALL,
+    CALLBACK_PREFIX_OWED_PERSON,
+    CALLBACK_PREFIX_REMOVE_BORROWER_CANCEL,
+    CALLBACK_PREFIX_REMOVE_BORROWER_CONFIRM,
+    CALLBACK_PREFIX_REMOVE_BORROWER_PICK,
+    CALLBACK_PREFIX_SETTLE_CANCEL,
+    CALLBACK_PREFIX_SETTLE_CONFIRM,
+    CALLBACK_PREFIX_SETTLE_PERSON,
+    CALLBACK_PREFIX_SHARED_BORROWER,
+    CALLBACK_PREFIX_SHARED_CANCEL,
+    CALLBACK_PREFIX_SHARED_CATEGORY,
+    CALLBACK_PREFIX_SHARED_CONFIRM,
+    CALLBACK_PREFIX_SHARED_DESC_SKIP,
+    CALLBACK_PREFIX_SHARED_DONE,
     TRANSACTION_COMMANDS,
 )
 from core.logging import get_logger
 from .bot import create_application
 from .commands import (
+    build_borrowers_message,
     build_help_message,
-    build_owed_message,
     build_transaction_history_message,
     build_welcome_message,
     handle_account_selected,
+    handle_add_borrower_command,
     handle_category_selected,
     handle_delete_command,
     handle_description_skipped,
     handle_edit_command,
+    handle_owed_all_selected,
+    handle_owed_command,
+    handle_owed_person_selected,
     handle_plain_message,
+    handle_remove_borrower_cancelled,
+    handle_remove_borrower_command,
+    handle_remove_borrower_confirmed,
+    handle_remove_borrower_picked,
+    handle_settle_cancelled,
     handle_settle_command,
+    handle_settle_confirmed,
+    handle_settle_person_selected,
+    handle_shared_borrower_toggled,
+    handle_shared_borrowers_done,
+    handle_shared_cancelled,
+    handle_shared_category_selected,
     handle_shared_command,
+    handle_shared_confirmed,
+    handle_shared_description_skipped,
     handle_transaction_command,
 )
 
@@ -34,6 +65,20 @@ CALLBACK_HANDLERS = {
     CALLBACK_PREFIX_CATEGORY: handle_category_selected,
     CALLBACK_PREFIX_ACCOUNT: handle_account_selected,
     CALLBACK_PREFIX_DESCRIPTION_SKIP: handle_description_skipped,
+    CALLBACK_PREFIX_SHARED_BORROWER: handle_shared_borrower_toggled,
+    CALLBACK_PREFIX_SHARED_DONE: handle_shared_borrowers_done,
+    CALLBACK_PREFIX_SHARED_CANCEL: handle_shared_cancelled,
+    CALLBACK_PREFIX_SHARED_CATEGORY: handle_shared_category_selected,
+    CALLBACK_PREFIX_SHARED_DESC_SKIP: handle_shared_description_skipped,
+    CALLBACK_PREFIX_SHARED_CONFIRM: handle_shared_confirmed,
+    CALLBACK_PREFIX_OWED_PERSON: handle_owed_person_selected,
+    CALLBACK_PREFIX_OWED_ALL: handle_owed_all_selected,
+    CALLBACK_PREFIX_SETTLE_PERSON: handle_settle_person_selected,
+    CALLBACK_PREFIX_SETTLE_CONFIRM: handle_settle_confirmed,
+    CALLBACK_PREFIX_SETTLE_CANCEL: handle_settle_cancelled,
+    CALLBACK_PREFIX_REMOVE_BORROWER_PICK: handle_remove_borrower_picked,
+    CALLBACK_PREFIX_REMOVE_BORROWER_CONFIRM: handle_remove_borrower_confirmed,
+    CALLBACK_PREFIX_REMOVE_BORROWER_CANCEL: handle_remove_borrower_cancelled,
 }
 
 
@@ -95,7 +140,19 @@ def _dispatch_command(message):
         return
 
     if command == '/owed':
-        _send_reply(message.chat_id, build_owed_message())
+        _send_result(message.chat_id, handle_owed_command(message.text))
+        return
+
+    if command == '/borrowers':
+        _send_reply(message.chat_id, build_borrowers_message())
+        return
+
+    if command == '/addborrower':
+        _send_result(message.chat_id, handle_add_borrower_command(message.chat_id, message.text))
+        return
+
+    if command == '/removeborrower':
+        _send_result(message.chat_id, handle_remove_borrower_command(message.text))
         return
 
     transaction_type = TRANSACTION_COMMANDS.get(command)
